@@ -1,9 +1,10 @@
-﻿using Aura.Domain.Entities;
+﻿using Aura.Application.Common.Interfaces;
+using Aura.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Aura.Infrastructure.Data;
 
-public class AuraDbContext : DbContext
+public class AuraDbContext : DbContext , IAuraDbContext
 {
     public AuraDbContext(DbContextOptions<AuraDbContext> options)
         : base(options)
