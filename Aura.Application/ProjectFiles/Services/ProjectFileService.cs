@@ -1,5 +1,6 @@
 using Aura.Application.Common.Exceptions;
 using Aura.Application.Common.Interfaces;
+using Aura.Application.Common.Security;
 using Aura.Application.ProjectFiles.DTOs;
 using Aura.Application.ProjectFiles.Interfaces;
 using Aura.Application.ProjectFiles.Validation;
@@ -13,11 +14,6 @@ public sealed class ProjectFileService(
     IUserIdentityService userIdentityService,
     IDateTimeProvider dateTimeProvider) : IProjectFileService
 {
-    private const string ResourceType = "ProjectFile";
-    private const string AccessLevel = "Read";
-    private const string Granted = "Granted";
-    private const string Revoked = "Revoked";
-
     public async Task<ProjectFileDto?> RegisterAsync(Guid projectId, RegisterProjectFileRequest request, CancellationToken cancellationToken = default)
     {
         var userId = await userIdentityService.GetCurrentUserIdAsync(cancellationToken);
@@ -112,8 +108,10 @@ public sealed class ProjectFileService(
             dbContext.Permissions.Add(new Permission
             {
                 Id = Guid.NewGuid(), UserId = userId, ProjectId = projectId,
-                ResourceType = ResourceType, ResourceIdentifier = fileId.ToString("D"),
-                AccessLevel = AccessLevel, Status = Granted,
+                ResourceType = ProjectFilePermissionConvention.ResourceType,
+                ResourceIdentifier = ProjectFilePermissionConvention.FormatResourceIdentifier(fileId),
+                AccessLevel = ProjectFilePermissionConvention.AccessLevel,
+                Status = ProjectFilePermissionConvention.GrantedStatus,
                 GrantedAt = now, CreatedAt = now, UpdatedAt = now
             });
         }
@@ -121,7 +119,7 @@ public sealed class ProjectFileService(
         {
             foreach (var permission in permissions)
             {
-                permission.Status = Granted;
+                permission.Status = ProjectFilePermissionConvention.GrantedStatus;
                 permission.GrantedAt = now;
                 permission.RevokedAt = null;
                 permission.UpdatedAt = now;
@@ -145,7 +143,7 @@ public sealed class ProjectFileService(
         var userId = await userIdentityService.GetCurrentUserIdAsync(cancellationToken);
         if (!await OwnsFileAsync(projectId, fileId, userId, cancellationToken)) return null;
         var approved = await ScopedPermissions(projectId, fileId, userId).AsNoTracking()
-            .AnyAsync(x => x.Status == Granted && x.RevokedAt == null, cancellationToken);
+            .AnyAsync(x => x.Status == ProjectFilePermissionConvention.GrantedStatus && x.RevokedAt == null, cancellationToken);
         return new(projectId, fileId, approved);
     }
 
@@ -161,8 +159,9 @@ public sealed class ProjectFileService(
 
     private IQueryable<Permission> ScopedPermissions(Guid projectId, Guid fileId, Guid userId) =>
         dbContext.Permissions.Where(x => x.UserId == userId && x.ProjectId == projectId &&
-            x.ResourceType == ResourceType && x.ResourceIdentifier == fileId.ToString("D") &&
-            x.AccessLevel == AccessLevel);
+            x.ResourceType == ProjectFilePermissionConvention.ResourceType &&
+            x.ResourceIdentifier == ProjectFilePermissionConvention.FormatResourceIdentifier(fileId) &&
+            x.AccessLevel == ProjectFilePermissionConvention.AccessLevel);
 
     private async Task RevokePermissionRecordsAsync(Guid projectId, Guid fileId, Guid userId, CancellationToken cancellationToken)
     {
@@ -170,7 +169,7 @@ public sealed class ProjectFileService(
         var now = dateTimeProvider.UtcNow;
         foreach (var permission in permissions)
         {
-            permission.Status = Revoked;
+            permission.Status = ProjectFilePermissionConvention.RevokedStatus;
             permission.RevokedAt = now;
             permission.UpdatedAt = now;
         }
