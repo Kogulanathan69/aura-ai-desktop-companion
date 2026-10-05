@@ -36,4 +36,14 @@ public class AuraDbContext : DbContext
     public DbSet<Reminder> Reminders => Set<Reminder>();
 
     public DbSet<PersonalMemory> PersonalMemories => Set<PersonalMemory>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.HasPostgresExtension("vector");
+
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(AuraDbContext).Assembly);
+    }
 }
