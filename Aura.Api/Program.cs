@@ -10,6 +10,8 @@ using Aura.Application.ProjectFiles.Interfaces;
 using Aura.Application.ProjectFiles.Services;
 using Aura.Application.ProjectContext.Interfaces;
 using Aura.Application.ProjectContext.Services;
+using Aura.Application.Privacy.Interfaces;
+using Aura.Application.Privacy.Services;
 using Aura.Infrastructure.Data;
 using Aura.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -56,6 +58,7 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IProjectSessionService, ProjectSessionService>();
 builder.Services.AddScoped<IProjectFileService, ProjectFileService>();
 builder.Services.AddScoped<IProjectContextService, ProjectContextService>();
+builder.Services.AddSingleton<IPrivacyGuard, PrivacyGuard>();
 builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
 
 // Current User
