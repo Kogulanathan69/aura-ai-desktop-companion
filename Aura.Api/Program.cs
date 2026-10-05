@@ -4,6 +4,8 @@ using Aura.Application.Common.Interfaces;
 using Aura.Application.Common.Services;
 using Aura.Application.Projects.Interfaces;
 using Aura.Application.Projects.Services;
+using Aura.Application.ProjectSessions.Interfaces;
+using Aura.Application.ProjectSessions.Services;
 using Aura.Infrastructure.Data;
 using Aura.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +49,7 @@ builder.Services.AddHttpContextAccessor();
 
 // Application Services
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IProjectSessionService, ProjectSessionService>();
 builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
 
 // Current User
@@ -83,5 +86,6 @@ app.MapGet("/", () => Results.Ok(new
 }));
 
 app.MapProjectEndpoints();
+app.MapProjectSessionEndpoints();
 
 app.Run();
