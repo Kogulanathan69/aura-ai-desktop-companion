@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Aura.Application\Aura.Application.csproj" />
+    <ProjectReference Include="..\Aura.Domain\Aura.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
