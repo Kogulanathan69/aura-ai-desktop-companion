@@ -11,6 +11,8 @@ using Aura.Application.ProjectFiles.Services;
 using Aura.Application.ProjectFiles.Content;
 using Aura.Application.ProjectMemories.Interfaces;
 using Aura.Application.ProjectMemories.Services;
+using Aura.Application.Conversations.Interfaces;
+using Aura.Application.Conversations.Services;
 using Aura.Application.ProjectContext.Interfaces;
 using Aura.Application.ProjectContext.Services;
 using Aura.Application.Privacy.Interfaces;
@@ -61,6 +63,7 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IProjectSessionService, ProjectSessionService>();
 builder.Services.AddScoped<IProjectFileService, ProjectFileService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
+builder.Services.AddScoped<IConversationService, ConversationService>();
 // Startup-bound server configuration; no client or runtime toggle.
 builder.Services.AddSingleton(builder.Configuration.GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new ProjectFileAccessOptions());
@@ -109,5 +112,6 @@ app.MapProjectFileEndpoints();
 app.MapProjectFileContentEndpoints();
 app.MapProjectContextEndpoints();
 app.MapProjectMemoryEndpoints();
+app.MapConversationEndpoints();
 
 app.Run();
