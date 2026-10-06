@@ -93,6 +93,8 @@ public class UpdateContextProxy : DispatchProxy
     internal DbSet<ProjectFile> Files { get; set; } = null!;
     internal DbSet<ProjectMemory> Memories { get; set; } = null!;
     internal DbSet<ProjectSession> Sessions { get; set; } = null!;
+    internal DbSet<Conversation> Conversations { get; set; } = null!;
+    internal DbSet<Message> Messages { get; set; } = null!;
     internal int Saves { get; private set; }
     protected override object? Invoke(MethodInfo? method, object?[]? args) => method?.Name switch
     {
@@ -100,6 +102,8 @@ public class UpdateContextProxy : DispatchProxy
         "get_ProjectFiles" => Files,
         "get_ProjectMemories" => Memories,
         "get_ProjectSessions" => Sessions,
+        "get_Conversations" => Conversations,
+        "get_Messages" => Messages,
         "SaveChangesAsync" => Save(),
         _ => throw new InvalidOperationException("Unexpected context operation: " + method?.Name)
     };
