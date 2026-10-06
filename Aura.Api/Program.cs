@@ -95,7 +95,7 @@ builder.Services.AddHttpClient<ILocalAiProvider, OllamaAiProvider>(client =>
     .ConfigurePrimaryHttpMessageHandler(OllamaConfiguration.CreateHandler)
     .RemoveAllLoggers();
 
-// Independent cloud foundation; no chat orchestration consumes this registration.
+// Transport registrations remain independent; router alone controls selection.
 var openAiOptions = builder.Configuration.GetSection(OpenAiOptions.SectionName).Get<OpenAiOptions>() ?? new();
 if (openAiOptions.Enabled && !OpenAiConfiguration.TryValidate(openAiOptions))
     throw new InvalidOperationException("Cloud AI configuration is invalid.");
@@ -104,6 +104,10 @@ builder.Services.AddHttpClient<ICloudAiProvider, OpenAiProvider>(client =>
     client.Timeout = TimeSpan.FromSeconds(120))
     .ConfigurePrimaryHttpMessageHandler(OpenAiConfiguration.CreateHandler)
     .RemoveAllLoggers();
+
+builder.Services.AddSingleton(builder.Configuration.GetSection(AiProviderRouterOptions.SectionName)
+    .Get<AiProviderRouterOptions>() ?? new AiProviderRouterOptions());
+builder.Services.AddScoped<IAiProviderRouter, AiProviderRouter>();
 
 // Database
 builder.Services.AddDbContext<AuraDbContext>(options =>

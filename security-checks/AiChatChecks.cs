@@ -6,6 +6,7 @@ using Aura.Application.AI.Chat.Interfaces;
 using Aura.Application.AI.Chat.Services;
 using Aura.Application.AI.DTOs;
 using Aura.Application.AI.Interfaces;
+using Aura.Application.AI.Providers;
 using Aura.Application.AI.Models;
 using Aura.Application.AI.Validation;
 using Aura.Application.Common.Exceptions;
@@ -157,7 +158,8 @@ internal static class AiChatChecks
         { httpCalls++; throw new InvalidOperationException("Disabled must not send HTTP."); });
         using var httpClient = new HttpClient(httpHandler);
         var disabledProvider = new Aura.Infrastructure.AI.Ollama.OllamaAiProvider(httpClient, new());
-        var disabledChat = new AiChatService(disabled.Context, new CheckIdentity(disabled.User), disabled.Clock, disabledProvider);
+        var disabledChat = new AiChatService(disabled.Context, new CheckIdentity(disabled.User), disabled.Clock,
+            new AiProviderRouter(disabledProvider, new RouterProviderFake(), new()));
         var disabledResult = await disabledChat.GenerateAsync(disabled.Conversation.Id, new("Keep local history"));
         check(disabledResult.Status == AiChatStatus.GenerationFailed && disabledResult.GenerationStatus == AiGenerationStatus.Disabled &&
             disabled.Persisted.Count == 1 && httpCalls == 0, "real default-disabled Ollama orchestration persists user with zero HTTP");
@@ -203,7 +205,7 @@ internal sealed class ChatFixture
             SavedLastMessageAt = Conversation.LastMessageAt;
             return Task.FromResult(1);
         };
-        Service = new(Context, new CheckIdentity(User), Clock, Provider);
+        Service = new(Context, new CheckIdentity(User), Clock, new AiProviderRouter(Provider, new RouterProviderFake(), new()));
     }
 }
 internal sealed class ChatMessageSet(List<Message> rows) : CheckDbSet<Message>(rows), IQueryable<Message>
