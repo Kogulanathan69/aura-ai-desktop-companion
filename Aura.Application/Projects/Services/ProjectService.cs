@@ -1,4 +1,5 @@
 using Aura.Application.Common.Interfaces;
+using Aura.Application.Common.Exceptions;
 using Aura.Application.Projects.DTOs;
 using Aura.Application.Projects.Interfaces;
 using Aura.Application.Projects.Validation;
@@ -123,9 +124,12 @@ public sealed class ProjectService : IProjectService
             return null;
         }
 
+        // Creation preserves LocalPath verbatim: no path normalization is part of this API.
+        if (!string.Equals(project.LocalPath, request.LocalPath, StringComparison.Ordinal))
+            throw new AppValidationException("Registered project root cannot be changed.");
+
         project.Name = request.Name.Trim();
         project.Description = request.Description;
-        project.LocalPath = request.LocalPath;
         project.RepositoryUrl = request.RepositoryUrl;
         project.CurrentBranch = currentBranch;
         project.Status = status;
