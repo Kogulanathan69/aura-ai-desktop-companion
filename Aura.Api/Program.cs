@@ -20,6 +20,8 @@ using Aura.Application.Privacy.Services;
 using Aura.Infrastructure.Data;
 using Aura.Infrastructure.Services;
 using Aura.Application.AI.Interfaces;
+using Aura.Application.AI.Chat.Interfaces;
+using Aura.Application.AI.Chat.Services;
 using Aura.Infrastructure.AI.Ollama;
 using Microsoft.EntityFrameworkCore;
 using Aura.Api.Endpoints;
@@ -66,6 +68,7 @@ builder.Services.AddScoped<IProjectSessionService, ProjectSessionService>();
 builder.Services.AddScoped<IProjectFileService, ProjectFileService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
 builder.Services.AddScoped<IConversationService, ConversationService>();
+builder.Services.AddScoped<IAiChatService, AiChatService>();
 // Startup-bound server configuration; no client or runtime toggle.
 builder.Services.AddSingleton(builder.Configuration.GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new ProjectFileAccessOptions());
@@ -124,5 +127,6 @@ app.MapProjectFileContentEndpoints();
 app.MapProjectContextEndpoints();
 app.MapProjectMemoryEndpoints();
 app.MapConversationEndpoints();
+app.MapAiChatEndpoints();
 
 app.Run();

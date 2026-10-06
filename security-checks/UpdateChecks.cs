@@ -96,6 +96,7 @@ public class UpdateContextProxy : DispatchProxy
     internal DbSet<Conversation> Conversations { get; set; } = null!;
     internal DbSet<Message> Messages { get; set; } = null!;
     internal int Saves { get; private set; }
+    internal Func<int, Task<int>>? SaveHook { get; set; }
     protected override object? Invoke(MethodInfo? method, object?[]? args) => method?.Name switch
     {
         "get_Projects" => Projects,
@@ -107,7 +108,7 @@ public class UpdateContextProxy : DispatchProxy
         "SaveChangesAsync" => Save(),
         _ => throw new InvalidOperationException("Unexpected context operation: " + method?.Name)
     };
-    private Task<int> Save() { Saves++; return Task.FromResult(1); }
+    private Task<int> Save() { Saves++; return SaveHook?.Invoke(Saves) ?? Task.FromResult(1); }
 }
 
 internal sealed class CheckIdentity(Guid id) : IUserIdentityService
@@ -118,7 +119,7 @@ internal sealed class CheckClock : IDateTimeProvider
 {
     public DateTime UtcNow { get; } = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 }
-internal sealed class CheckDbSet<T>(IEnumerable<T> items) : DbSet<T>, IQueryable<T> where T : class
+internal class CheckDbSet<T>(IEnumerable<T> items) : DbSet<T>, IQueryable<T> where T : class
 {
     public override Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<T> Add(T entity)
     { ((ICollection<T>)items).Add(entity); return null!; }

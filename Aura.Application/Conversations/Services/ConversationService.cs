@@ -2,6 +2,7 @@ using Aura.Application.Common.Interfaces;
 using Aura.Application.Conversations.DTOs;
 using Aura.Application.Conversations.Interfaces;
 using Aura.Application.Conversations.Validation;
+using Aura.Application.Conversations.Security;
 using Aura.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -97,9 +98,7 @@ public sealed class ConversationService(IAuraDbContext dbContext, IUserIdentityS
         return ToDto(message);
     }
 
-    private IQueryable<Conversation> OwnedConversations(Guid userId) => dbContext.Conversations.Where(x =>
-        x.UserId == userId && ((x.Type == "General" && x.ProjectId == null) ||
-        (x.Type == "Project" && x.ProjectId != null && dbContext.Projects.Any(p => p.Id == x.ProjectId && p.UserId == userId))));
+    private IQueryable<Conversation> OwnedConversations(Guid userId) => dbContext.OwnedConversations(userId);
 
     private IQueryable<Message> ScopedMessages(Guid conversationId) => dbContext.Messages.Where(x => x.ConversationId == conversationId);
     private static ConversationDto ToDto(Conversation x) => new(x.Id, x.ProjectId, x.Title, x.Type,
