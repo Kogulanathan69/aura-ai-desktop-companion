@@ -23,6 +23,8 @@ using Aura.Application.AI.Interfaces;
 using Aura.Application.AI.Chat.Interfaces;
 using Aura.Application.AI.Chat.Services;
 using Aura.Infrastructure.AI.Ollama;
+using Aura.Application.AI.Providers;
+using Aura.Infrastructure.AI.OpenAI;
 using Microsoft.EntityFrameworkCore;
 using Aura.Api.Endpoints;
 
@@ -91,6 +93,16 @@ builder.Services.AddSingleton(ollamaOptions);
 builder.Services.AddHttpClient<ILocalAiProvider, OllamaAiProvider>(client =>
     client.Timeout = TimeSpan.FromSeconds(120))
     .ConfigurePrimaryHttpMessageHandler(OllamaConfiguration.CreateHandler)
+    .RemoveAllLoggers();
+
+// Independent cloud foundation; no chat orchestration consumes this registration.
+var openAiOptions = builder.Configuration.GetSection(OpenAiOptions.SectionName).Get<OpenAiOptions>() ?? new();
+if (openAiOptions.Enabled && !OpenAiConfiguration.TryValidate(openAiOptions))
+    throw new InvalidOperationException("Cloud AI configuration is invalid.");
+builder.Services.AddSingleton(openAiOptions);
+builder.Services.AddHttpClient<ICloudAiProvider, OpenAiProvider>(client =>
+    client.Timeout = TimeSpan.FromSeconds(120))
+    .ConfigurePrimaryHttpMessageHandler(OpenAiConfiguration.CreateHandler)
     .RemoveAllLoggers();
 
 // Database
