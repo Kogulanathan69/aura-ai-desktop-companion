@@ -8,6 +8,7 @@ using Aura.Application.ProjectSessions.Interfaces;
 using Aura.Application.ProjectSessions.Services;
 using Aura.Application.ProjectFiles.Interfaces;
 using Aura.Application.ProjectFiles.Services;
+using Aura.Application.ProjectFiles.Content;
 using Aura.Application.ProjectContext.Interfaces;
 using Aura.Application.ProjectContext.Services;
 using Aura.Application.Privacy.Interfaces;
@@ -57,6 +58,11 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IProjectSessionService, ProjectSessionService>();
 builder.Services.AddScoped<IProjectFileService, ProjectFileService>();
+// Startup-bound server configuration; no client or runtime toggle.
+builder.Services.AddSingleton(builder.Configuration.GetSection(ProjectFileAccessOptions.SectionName)
+    .Get<ProjectFileAccessOptions>() ?? new ProjectFileAccessOptions());
+builder.Services.AddScoped<ISafeProjectFileContentService, SafeProjectFileContentService>();
+builder.Services.AddSingleton<IProjectFileContentReader, ProjectFileContentReader>();
 builder.Services.AddScoped<IProjectContextService, ProjectContextService>();
 builder.Services.AddSingleton<IPrivacyGuard, PrivacyGuard>();
 builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
@@ -97,6 +103,7 @@ app.MapGet("/", () => Results.Ok(new
 app.MapProjectEndpoints();
 app.MapProjectSessionEndpoints();
 app.MapProjectFileEndpoints();
+app.MapProjectFileContentEndpoints();
 app.MapProjectContextEndpoints();
 
 app.Run();

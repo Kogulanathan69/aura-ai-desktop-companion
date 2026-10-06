@@ -67,16 +67,9 @@ public sealed class ProjectFileService(
         if (file is null) return null;
 
         var (path, name, extension) = ProjectFileValidation.Normalize(request.RelativePath, request.FileName, request.Extension);
-        if (path != file.RelativePath)
-        {
-            if (await ScopedFiles(projectId).AnyAsync(x => x.Id != fileId && x.RelativePath == path, cancellationToken))
-                throw new AppValidationException("This file path is already registered for the project.");
-            await RevokePermissionRecordsAsync(projectId, fileId, userId, cancellationToken);
-        }
-
-        file.RelativePath = path;
-        file.FileName = name;
-        file.Extension = extension;
+        var stored = ProjectFileValidation.Normalize(file.RelativePath, file.FileName, file.Extension);
+        if ((path, name, extension) != stored)
+            throw new AppValidationException("Registered file identity cannot be changed. Remove and register the file again to change its path or file type.");
         // IsSensitive and indexing fields are server managed after registration.
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToDto(file);
