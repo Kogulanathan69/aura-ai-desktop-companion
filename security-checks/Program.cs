@@ -21,6 +21,7 @@ await UpdateChecks.RunAsync(Check);
 await MemoryChecks.RunAsync(Check);
 await ConversationChecks.RunAsync(Check);
 await OllamaChecks.RunAsync(Check);
+await AiChatChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();
