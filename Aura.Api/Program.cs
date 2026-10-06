@@ -19,6 +19,8 @@ using Aura.Application.Privacy.Interfaces;
 using Aura.Application.Privacy.Services;
 using Aura.Infrastructure.Data;
 using Aura.Infrastructure.Services;
+using Aura.Application.AI.Interfaces;
+using Aura.Infrastructure.AI.Ollama;
 using Microsoft.EntityFrameworkCore;
 using Aura.Api.Endpoints;
 
@@ -78,6 +80,15 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 // Infrastructure Services
 builder.Services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+// Server-only startup snapshot; provider validates it again before every request.
+var ollamaOptions = builder.Configuration.GetSection(OllamaOptions.SectionName).Get<OllamaOptions>() ?? new();
+if (ollamaOptions.Enabled && !OllamaConfiguration.TryValidate(ollamaOptions, out _))
+    throw new InvalidOperationException("Local AI configuration is invalid.");
+builder.Services.AddSingleton(ollamaOptions);
+builder.Services.AddHttpClient<ILocalAiProvider, OllamaAiProvider>(client =>
+    client.Timeout = TimeSpan.FromSeconds(120))
+    .ConfigurePrimaryHttpMessageHandler(OllamaConfiguration.CreateHandler)
+    .RemoveAllLoggers();
 
 // Database
 builder.Services.AddDbContext<AuraDbContext>(options =>

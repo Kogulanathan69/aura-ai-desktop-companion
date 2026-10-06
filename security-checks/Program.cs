@@ -20,6 +20,7 @@ void Check(bool condition, string name)
 await UpdateChecks.RunAsync(Check);
 await MemoryChecks.RunAsync(Check);
 await ConversationChecks.RunAsync(Check);
+await OllamaChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();
