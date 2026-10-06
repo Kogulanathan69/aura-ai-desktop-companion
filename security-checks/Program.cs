@@ -23,6 +23,7 @@ await ConversationChecks.RunAsync(Check);
 await OllamaChecks.RunAsync(Check);
 await AiChatChecks.RunAsync(Check);
 await OpenAiChecks.RunAsync(Check);
+await RouterChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();

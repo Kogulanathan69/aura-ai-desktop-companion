@@ -144,6 +144,6 @@ internal static class OpenAiChecks
         check((await new OpenAiProvider(bodyClient, Options(timeout: 1)).GenerateAsync(new("prompt"))).Status == AiGenerationStatus.TimedOut,
             "OpenAI configured deadline bounds stalled body");
         check(typeof(AiChatService).GetConstructors().SelectMany(x => x.GetParameters()).All(x => x.ParameterType != typeof(ICloudAiProvider)),
-            "Step 11J remains isolated from cloud provider");
+            "Step 11J has no direct cloud transport dependency");
     }
 }

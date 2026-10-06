@@ -2,7 +2,7 @@ using Aura.Application.AI.Chat.DTOs;
 using Aura.Application.AI.Chat.Interfaces;
 using Aura.Application.AI.Chat.Validation;
 using Aura.Application.AI.DTOs;
-using Aura.Application.AI.Interfaces;
+using Aura.Application.AI.Providers;
 using Aura.Application.AI.Models;
 using Aura.Application.Common.Interfaces;
 using Aura.Application.Conversations.DTOs;
@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Aura.Application.AI.Chat.Services;
 
 public sealed class AiChatService(IAuraDbContext dbContext, IUserIdentityService identity,
-    IDateTimeProvider clock, ILocalAiProvider provider) : IAiChatService
+    IDateTimeProvider clock, IAiProviderRouter provider) : IAiChatService
 {
     public async Task<AiChatResponse> GenerateAsync(Guid conversationId, AiChatRequest request, CancellationToken cancellationToken = default)
     {
