@@ -91,11 +91,15 @@ public class UpdateContextProxy : DispatchProxy
 {
     internal DbSet<Project> Projects { get; set; } = null!;
     internal DbSet<ProjectFile> Files { get; set; } = null!;
+    internal DbSet<ProjectMemory> Memories { get; set; } = null!;
+    internal DbSet<ProjectSession> Sessions { get; set; } = null!;
     internal int Saves { get; private set; }
     protected override object? Invoke(MethodInfo? method, object?[]? args) => method?.Name switch
     {
         "get_Projects" => Projects,
         "get_ProjectFiles" => Files,
+        "get_ProjectMemories" => Memories,
+        "get_ProjectSessions" => Sessions,
         "SaveChangesAsync" => Save(),
         _ => throw new InvalidOperationException("Unexpected context operation: " + method?.Name)
     };
@@ -112,6 +116,10 @@ internal sealed class CheckClock : IDateTimeProvider
 }
 internal sealed class CheckDbSet<T>(IEnumerable<T> items) : DbSet<T>, IQueryable<T> where T : class
 {
+    public override Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<T> Add(T entity)
+    { ((ICollection<T>)items).Add(entity); return null!; }
+    public override Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<T> Remove(T entity)
+    { ((ICollection<T>)items).Remove(entity); return null!; }
     public override Microsoft.EntityFrameworkCore.Metadata.IEntityType EntityType => throw new NotSupportedException();
     private readonly IQueryable<T> query = items.AsQueryable();
     Type IQueryable.ElementType => typeof(T);
@@ -120,13 +128,21 @@ internal sealed class CheckDbSet<T>(IEnumerable<T> items) : DbSet<T>, IQueryable
     IEnumerator<T> IEnumerable<T>.GetEnumerator() => query.GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => query.GetEnumerator();
 }
-internal sealed class CheckQuery<T>(Expression expression, IQueryProvider inner) : IQueryable<T>
+internal sealed class CheckQuery<T>(Expression expression, IQueryProvider inner) : IOrderedQueryable<T>, IAsyncEnumerable<T>
 {
     public Type ElementType => typeof(T);
     public Expression Expression => expression;
     public IQueryProvider Provider => new CheckQueryProvider(inner);
     public IEnumerator<T> GetEnumerator() => inner.CreateQuery<T>(expression).GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default) =>
+        new CheckAsyncEnumerator<T>(GetEnumerator(), cancellationToken);
+}
+internal sealed class CheckAsyncEnumerator<T>(IEnumerator<T> inner, CancellationToken cancellationToken) : IAsyncEnumerator<T>
+{
+    public T Current => inner.Current;
+    public ValueTask<bool> MoveNextAsync() { cancellationToken.ThrowIfCancellationRequested(); return ValueTask.FromResult(inner.MoveNext()); }
+    public ValueTask DisposeAsync() { inner.Dispose(); return ValueTask.CompletedTask; }
 }
 internal sealed class CheckQueryProvider(IQueryProvider inner) : IAsyncQueryProvider
 {
