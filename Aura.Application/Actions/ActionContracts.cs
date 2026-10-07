@@ -1,4 +1,5 @@
 using Aura.Application.Tools;
+using Aura.Application.Approvals;
 
 namespace Aura.Application.Actions;
 
@@ -32,20 +33,33 @@ public sealed record ActionDescriptor
     public DateTime UpdatedAt { get; }
     public bool RequiresApproval => true;
     public bool IsVerified => false;
-    // Linkage slots only. No Step 11O path assigns or trusts these as evidence.
-    public Guid? ApprovalId => null;
+    // Assigned only by the narrow Step 11P approval transition; an ID alone is not evidence.
+    public Guid? ApprovalId { get; }
     public Guid? ToolExecutionId => null;
     public Guid? VerificationId => null;
 
     internal ActionDescriptor(ActionIdentifier id, ActionScope scope, ToolIdentifier toolId,
-        string summary, ActionLifecycleStatus status, DateTime createdAt, DateTime updatedAt)
+        string summary, ActionLifecycleStatus status, DateTime createdAt, DateTime updatedAt, Guid? approvalId = null)
     {
         Id = id; Scope = scope; ToolId = toolId; Summary = summary;
         Status = status; CreatedAt = createdAt; UpdatedAt = updatedAt;
+        ApprovalId = approvalId;
     }
 
-    internal ActionDescriptor Transition(ActionLifecycleStatus status, DateTime updatedAt) =>
-        new(Id, Scope, ToolId, Summary, status, CreatedAt, updatedAt);
+    internal ActionDescriptor Transition(ActionLifecycleStatus status, DateTime updatedAt)
+    {
+        if (ActionTransitionPolicy.Evaluate(Status, status) != ActionOperationStatus.Success)
+            throw new InvalidOperationException("Action transition denied.");
+        return new(Id, Scope, ToolId, Summary, status, CreatedAt, updatedAt, ApprovalId);
+    }
+
+    internal ActionDescriptor Approve(ApprovalEvidence evidence)
+    {
+        if (Status != ActionLifecycleStatus.ApprovalRequired || ApprovalId is not null || evidence is null ||
+            !evidence.MatchesBinding(Id, Scope, ToolId) || evidence.IssuedAt < UpdatedAt)
+            throw new InvalidOperationException("Action approval denied.");
+        return new(Id, Scope, ToolId, Summary, ActionLifecycleStatus.Approved, CreatedAt, evidence.IssuedAt, evidence.Id.Value);
+    }
 }
 
 public enum ActionOperationStatus { Success, InvalidRequest, ScopeDenied, UnknownTool, TransitionDenied, ApprovalRequired, ExecutionDisabled, Failed }
