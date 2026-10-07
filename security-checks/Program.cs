@@ -26,6 +26,7 @@ await OpenAiChecks.RunAsync(Check);
 await RouterChecks.RunAsync(Check);
 await RetrievalChecks.RunAsync(Check);
 await ToolChecks.RunAsync(Check);
+await ActionChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();
