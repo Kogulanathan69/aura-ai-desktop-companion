@@ -1,0 +1,37 @@
+# Step 11S — Durable action/execution state foundation
+
+## Scope and architecture
+
+This step adds only immutable Application-layer state, transition policy, and a narrow async store contract. It adds no production persistence adapter or coordinator integration. The only mutable implementation is a one-state, lock-protected fake in `security-checks`. It is not registered in production and proves only the fixture's atomic compare-and-swap behavior. No domain entity or audit record is automatically written. Clean Architecture dependency direction is unchanged.
+
+`TrustedToolExecutionService` retains all Step 11R scope, approval, tool, permission, and policy gates, and still mints its own execution ID per accepted call. **A retained stale Approved `ActionDescriptor` can still be replayed through that service and invoke a synthetic handler again.** The new policy does not close that path until a future service integration and transactional store are implemented. Its existing one-handler-call-per-service-call limit remains the only active handler-call guarantee. No production readiness or live replay prevention is claimed.
+
+## State and version contract
+
+`ActionExecutionState` holds only ActionId, exact user/conversation/project `ActionScope`, ToolId, ApprovalId, bounded lifecycle status, `long` Version, optional ExecutionId, optional `ApprovalConsumedByExecutionId`, and optional `ExecutionOutcome`. It contains no summary, prompt, handler output, path, secret, arbitrary metadata, or collection. Store snapshots are data, not authorization credentials. `ApprovalEvidence` is unchanged and immutable.
+
+Statuses are `Ready`, `Reserved`, `Succeeded`, and `Failed`; unknown values fail validation. `CreateReady` requires exact evidence binding to an Approved action and produces version **0**, no execution ID, unconsumed approval, and no outcome. All IDs and scope components must be nonempty, and version must be nonnegative. `Ready` has no execution, consumption, or outcome. `Reserved` has version at least 1, one nonempty ExecutionId, matching consumed-by ID, and no outcome. Terminal states have version at least 2, preserve that same execution/consumption ID, and carry the matching Succeeded or Failed outcome. Malformed snapshots fail closed. No reset, retry, or terminal reopening exists.
+
+Every successful reserve or completion increments version by exactly one. Both operations require an exact `ExpectedVersion`; mismatch returns `StaleVersion`. Negative expected versions are invalid. A mutation at `long.MaxValue` returns `InvalidState` without overflow. The state policy is pure; a future adapter must enforce read/check/write atomically with optimistic concurrency, not by timestamp.
+
+## Reserve and completion
+
+`TryReserve` requires exact action, scope, tool, approval, nonnegative expected version, trusted-workflow-generated attempt ID, valid Ready state, and no consumed approval or previous reservation. It produces one Reserved snapshot with the attempt ID in both ExecutionId and ApprovalConsumedByExecutionId. The store boundary cannot invoke a handler. The existing public `ExecutionRequest` still contains only ActionId; it accepts no execution ID. The new attempt-ID factory creates a GUID and offers no arbitrary-value constructor. The factory and store contract are application APIs, not public endpoints; a future coordinator must call them only after ownership, approval, permission, and policy gates.
+
+`TryComplete` requires exact action, scope, tool, approval, reserved execution ID, expected version, and a defined `Succeeded` or `Failed` outcome. It preserves identity/consumption and creates a terminal snapshot. It does not call `VerificationWorkflowService` or fabricate a VerificationId or `ToolExecution` domain entity. The retained ID and outcome are structural provenance suitable for a later, independently attested Step 11Q handoff.
+
+Binding failures return fixed `NotFound`, `ScopeMismatch`, `ToolMismatch`, `ApprovalMismatch`, or `ExecutionMismatch` as applicable. Invalid requests/states return `InvalidRequest`/`InvalidState`. Stale version takes precedence over duplicate-state results after binding validation. Thus a second reserve using version 0 returns `StaleVersion`; using current version 1 returns `AlreadyReserved`. A reserve after completion with current version returns `AlreadyCompleted`. Duplicate completion with current version and the same execution ID returns `AlreadyCompleted`; a wrong execution ID returns `ExecutionMismatch`. No operation silently creates a second execution ID. `UnavailableActionExecutionStateStore` always returns `Unavailable`. Other deny results are fixed and at most 80 characters, with no state or raw exception.
+
+One approval can be marked consumed by only one execution in a state row. Another action/scope/tool cannot use that row's reservation. **Global approval uniqueness across different rows requires a unique constraint or equivalent transactional enforcement in the future database adapter.** This foundation does not provide cryptographic revocation or independently establish freshness, ownership, permission, or policy.
+
+## Limits and deferred runtime behavior
+
+This step cannot guarantee distributed or external side-effect exactly once, nor atomicity between a database commit and OS/tool effect. A future coordinator must reserve before invoking a handler, invoke at most once after success, and attempt completion without retrying the handler. If completion fails after a side effect, it must return a fixed safe failure rather than fabricate durable success; reconciliation or an outbox is future work. Cancellation before reservation means no handler; cancellation after reservation may leave a reservation requiring reconciliation; cancellation after handler side effects may leave an effect without durable completion. Store operations accept and propagate `CancellationToken`; the unavailable store and fake check cancellation before mutation. No retry or fallback is added.
+
+There is no PostgreSQL adapter, DbContext/EF configuration/schema/migration change, package change, production in-memory store registration, queue, lock service, real handler, shell/Git/filesystem/browser/HTTP/MCP execution, automatic verification, chat/provider integration, or real PostgreSQL/OpenAI/Ollama call. Safe File Access remains disabled. AiChatRequest remains Prompt-only. AiChatService and provider routing remain tool/action/execution-free.
+
+## Verification
+
+The package-free Step 11S checks exercise initial state and exact bindings, malformed states, version/stale/overflow behavior, reserve/consumption, complete/terminal behavior, bounded results, cancellation, default denial, immutable approval evidence, unchanged public request, and two concurrent attempts against the lock-protected fake. That fake has one fixed state slot; exactly one attempt succeeds, one is stale, and only one mutation occurs. It does not demonstrate PostgreSQL isolation, cross-row uniqueness, real coordinator replay protection, or live provider/runtime behavior.
+
+The solution build and full security suite use the user-local .NET 10.0.401 SDK. Runtime ownership validation, production permission/policy and transactional store behavior, PostgreSQL isolation/pgvector, real handler execution, side-effect reconciliation, semantic retrieval/ranking, and live OpenAI/Ollama remain unverified and deferred. AiChatService integration remains deferred.
