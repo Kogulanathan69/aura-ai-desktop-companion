@@ -196,7 +196,7 @@ internal static class VerificationChecks
             action.ToolExecutionId is null && action.VerificationId is null,
             "11Q action integration deferred; no fabricated execution, linkage or Verified state");
         check(typeof(VerificationWorkflowService).GetConstructors().Single().GetParameters().Select(x => x.ParameterType).SequenceEqual(
-            new[] { typeof(ToolRegistry), typeof(IVerificationScopeValidator), typeof(IExecutionEvidenceSource), typeof(IIndependentVerificationPolicy), typeof(IDateTimeProvider) }),
+            new[] { typeof(ToolRegistry), typeof(IVerificationScopeValidator), typeof(IExecutionEvidenceSource), typeof(IIndependentVerificationPolicy), typeof(IDateTimeProvider), typeof(Aura.Application.Auditing.IAuditEventWriter) }),
             "11Q no dispatcher/provider/database/persistence/OS dependencies");
         foreach (var type in new[] { typeof(AiChatService), typeof(AiProviderRouter) })
             check(type.GetConstructors().Single().GetParameters().All(x => x.ParameterType.Namespace != typeof(IVerificationWorkflowService).Namespace),

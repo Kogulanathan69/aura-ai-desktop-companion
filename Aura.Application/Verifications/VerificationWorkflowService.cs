@@ -2,13 +2,16 @@ using Aura.Application.Actions;
 using Aura.Application.Approvals;
 using Aura.Application.Common.Interfaces;
 using Aura.Application.Tools;
+using Aura.Application.Auditing;
 
 namespace Aura.Application.Verifications;
 
 public sealed class VerificationWorkflowService(ToolRegistry tools, IVerificationScopeValidator scopes,
-    IExecutionEvidenceSource executions, IIndependentVerificationPolicy policy, IDateTimeProvider clock)
+    IExecutionEvidenceSource executions, IIndependentVerificationPolicy policy, IDateTimeProvider clock,
+    IAuditEventWriter? auditWriter = null)
     : IVerificationWorkflowService
 {
+    private readonly IAuditEventWriter audit = auditWriter ?? new UnavailableAuditEventWriter();
     public async Task<VerificationOperationResult> VerifyAsync(ActionScope scope, ActionDescriptor action,
         ApprovalEvidence approval, VerificationRequest request, CancellationToken cancellationToken = default)
     {
@@ -49,7 +52,19 @@ public sealed class VerificationWorkflowService(ToolRegistry tools, IVerificatio
             if (now.Kind != DateTimeKind.Utc || now == default || now < execution.CompletedAt || now < action.UpdatedAt)
                 return VerificationOperationResult.Denied(VerificationOperationStatus.Failed);
             cancellationToken.ThrowIfCancellationRequested();
-            return VerificationOperationResult.Success(VerificationEvidence.Issue(execution, outcome, now));
+            var evidence = VerificationEvidence.Issue(execution, outcome, now);
+            var result = VerificationOperationResult.Success(evidence);
+            var auditOutcome = outcome switch
+            {
+                VerificationOutcome.Verified => AuditEventOutcome.Success,
+                VerificationOutcome.Failed => AuditEventOutcome.Failed,
+                _ => AuditEventOutcome.Inconclusive
+            };
+            await AuditObservation.RecordAsync(audit, AuditWriteRequest.Create(
+                AuditEventType.VerificationAssessed, auditOutcome, scope,
+                new(execution.ActionId, execution.ToolId, execution.ApprovalId,
+                    execution.ExecutionId, VerificationId: evidence.Id.Value)), cancellationToken);
+            return result;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception) { return VerificationOperationResult.Denied(VerificationOperationStatus.Failed); }

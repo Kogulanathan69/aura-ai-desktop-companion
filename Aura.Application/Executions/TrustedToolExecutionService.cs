@@ -2,14 +2,16 @@ using Aura.Application.Actions;
 using Aura.Application.Approvals;
 using Aura.Application.Common.Interfaces;
 using Aura.Application.Tools;
+using Aura.Application.Auditing;
 
 namespace Aura.Application.Executions;
 
 public sealed class TrustedToolExecutionService(ToolRegistry tools, IToolExecutionScopeValidator scopes,
     IToolExecutionPermissionValidator permissions, IToolExecutionPolicy policy, IDateTimeProvider clock,
-    IActionExecutionStateStore states)
+    IActionExecutionStateStore states, IAuditEventWriter? auditWriter = null)
     : ITrustedToolExecutionService
 {
+    private readonly IAuditEventWriter audit = auditWriter ?? new UnavailableAuditEventWriter();
     public async Task<ExecutionOperationResult> ExecuteAsync(ActionScope scope, ActionDescriptor action,
         ApprovalEvidence approval, ExecutionRequest request, CancellationToken cancellationToken = default)
     {
@@ -67,6 +69,11 @@ public sealed class TrustedToolExecutionService(ToolRegistry tools, IToolExecuti
                 reservedState.ApprovalConsumedByExecutionId != attempt.Value ||
                 reservedState.Version != 1)
                 return ExecutionOperationResult.Denied(ExecutionOperationStatus.ReconciliationRequired);
+            var auditReferences = new AuditEventReferences(action.Id, action.ToolId,
+                approval.Id.Value, attempt.Value);
+            await AuditObservation.RecordAsync(audit, AuditWriteRequest.Create(
+                AuditEventType.ExecutionReserved, AuditEventOutcome.Success, scope,
+                auditReferences), cancellationToken);
             var context = TrustedExecutionContext.Issue(action, approval, attempt, startedAt);
             var executing = action.BeginExecution(context);
             cancellationToken.ThrowIfCancellationRequested();
@@ -103,7 +110,14 @@ public sealed class TrustedToolExecutionService(ToolRegistry tools, IToolExecuti
                     ? ActionExecutionStateStatus.Succeeded : ActionExecutionStateStatus.Failed))
                 return ExecutionOperationResult.Denied(ExecutionOperationStatus.ReconciliationRequired);
             var evidence = ExecutionEvidence.Issue(context, outcome, completedAt);
-            return ExecutionOperationResult.Complete(executing.CompleteExecution(evidence), evidence);
+            var completedAction = executing.CompleteExecution(evidence);
+            var result = ExecutionOperationResult.Complete(completedAction, evidence);
+            await AuditObservation.RecordAsync(audit, AuditWriteRequest.Create(
+                outcome == ExecutionOutcome.Succeeded ? AuditEventType.ExecutionCompleted
+                    : AuditEventType.ExecutionFailed,
+                outcome == ExecutionOutcome.Succeeded ? AuditEventOutcome.Success
+                    : AuditEventOutcome.Failed, scope, auditReferences), cancellationToken);
+            return result;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception) { return ExecutionOperationResult.Denied(reserved || reservationAttempted

@@ -43,6 +43,7 @@ internal static class ExecutionChecks
         await ExecutionReconciliationChecks.RunAsync(check, approved, approval, alternateId!, otherProposed.Id);
         await ToolPermissionChecks.RunAsync(check);
         await AuditEventChecks.RunAsync(check, approved);
+        await AuditWorkflowChecks.RunAsync(check);
 
         check((await new TrustedToolExecutionService(tools, owner, new DenyToolExecutionPermissionValidator(), policy, clock, new AtomicExecutionStore())
             .ExecuteAsync(scope, approved, approval, request)).Status == ExecutionOperationStatus.PermissionDenied && handler.Calls == 0,
@@ -203,7 +204,8 @@ internal static class ExecutionChecks
             "11T stale Approved replay is denied without another handler call");
         check(typeof(TrustedToolExecutionService).GetConstructors().Single().GetParameters().Select(x => x.ParameterType).SequenceEqual(
             new[] { typeof(ToolRegistry), typeof(IToolExecutionScopeValidator), typeof(IToolExecutionPermissionValidator),
-                typeof(IToolExecutionPolicy), typeof(IDateTimeProvider), typeof(IActionExecutionStateStore) }),
+                typeof(IToolExecutionPolicy), typeof(IDateTimeProvider), typeof(IActionExecutionStateStore),
+                typeof(Aura.Application.Auditing.IAuditEventWriter) }),
             "11T coordinator depends on state store but no DB/provider/OS/verification/dispatcher");
         foreach (var type in new[] { typeof(AiChatService), typeof(AiProviderRouter) })
             check(type.GetConstructors().Single().GetParameters().All(x => x.ParameterType.Namespace != typeof(ITrustedToolExecutionService).Namespace),
