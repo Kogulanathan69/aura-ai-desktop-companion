@@ -31,6 +31,7 @@ await ApprovalChecks.RunAsync(Check);
 await VerificationChecks.RunAsync(Check);
 await ExecutionChecks.RunAsync(Check);
 await ProductionAdapterReadinessChecks.RunAsync(Check);
+await RuntimeSafetyChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();

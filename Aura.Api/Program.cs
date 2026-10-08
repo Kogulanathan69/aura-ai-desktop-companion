@@ -27,6 +27,7 @@ using Aura.Application.AI.Providers;
 using Aura.Infrastructure.AI.OpenAI;
 using Microsoft.EntityFrameworkCore;
 using Aura.Api.Endpoints;
+using Aura.Api.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,8 +73,9 @@ builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
 builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IAiChatService, AiChatService>();
 // Startup-bound server configuration; no client or runtime toggle.
-builder.Services.AddSingleton(builder.Configuration.GetSection(ProjectFileAccessOptions.SectionName)
-    .Get<ProjectFileAccessOptions>() ?? new ProjectFileAccessOptions());
+var projectFileAccessOptions = builder.Configuration.GetSection(ProjectFileAccessOptions.SectionName)
+    .Get<ProjectFileAccessOptions>() ?? new ProjectFileAccessOptions();
+builder.Services.AddSingleton(projectFileAccessOptions);
 builder.Services.AddScoped<ISafeProjectFileContentService, SafeProjectFileContentService>();
 builder.Services.AddSingleton<IProjectFileContentReader, ProjectFileContentReader>();
 builder.Services.AddScoped<IProjectContextService, ProjectContextService>();
@@ -105,9 +107,30 @@ builder.Services.AddHttpClient<ICloudAiProvider, OpenAiProvider>(client =>
     .ConfigurePrimaryHttpMessageHandler(OpenAiConfiguration.CreateHandler)
     .RemoveAllLoggers();
 
-builder.Services.AddSingleton(builder.Configuration.GetSection(AiProviderRouterOptions.SectionName)
-    .Get<AiProviderRouterOptions>() ?? new AiProviderRouterOptions());
+var routerOptions = builder.Configuration.GetSection(AiProviderRouterOptions.SectionName)
+    .Get<AiProviderRouterOptions>() ?? new AiProviderRouterOptions();
+builder.Services.AddSingleton(routerOptions);
 builder.Services.AddScoped<IAiProviderRouter, AiProviderRouter>();
+
+RuntimeSafetyOptions runtimeSafetyOptions;
+try
+{
+    runtimeSafetyOptions = builder.Configuration.GetSection(RuntimeSafetyOptions.SectionName)
+        .Get<RuntimeSafetyOptions>() ?? new RuntimeSafetyOptions();
+}
+catch (Exception)
+{
+    throw new InvalidOperationException(RuntimeSafetyValidator.FailureMessage);
+}
+var runtimeReadiness = new UnavailableRuntimeCapabilityReadiness();
+var runtimeSafetyValidator = new RuntimeSafetyValidator();
+if (runtimeSafetyValidator.Validate(runtimeSafetyOptions, runtimeReadiness.GetSnapshot(),
+        projectFileAccessOptions, routerOptions, openAiOptions) is
+    not (RuntimeSafetyStatus.SafeDisabled or RuntimeSafetyStatus.Valid))
+    throw new InvalidOperationException(RuntimeSafetyValidator.FailureMessage);
+builder.Services.AddSingleton(runtimeSafetyOptions);
+builder.Services.AddSingleton<IRuntimeCapabilityReadiness>(runtimeReadiness);
+builder.Services.AddSingleton(runtimeSafetyValidator);
 
 // Database
 builder.Services.AddDbContext<AuraDbContext>(options =>
