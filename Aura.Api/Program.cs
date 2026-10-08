@@ -28,6 +28,7 @@ using Aura.Infrastructure.AI.OpenAI;
 using Microsoft.EntityFrameworkCore;
 using Aura.Api.Endpoints;
 using Aura.Api.Security;
+using Aura.Application.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 

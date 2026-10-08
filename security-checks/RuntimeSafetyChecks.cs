@@ -1,4 +1,5 @@
 using Aura.Api.Security;
+using Aura.Application.Security;
 using Aura.Application.AI.Chat.DTOs;
 using Aura.Application.AI.Providers;
 using Aura.Application.ProjectFiles.Content;
