@@ -1,12 +1,14 @@
 using Aura.Application.Actions;
 using Aura.Application.Common.Interfaces;
 using Aura.Application.Tools;
+using Aura.Application.Auditing;
 
 namespace Aura.Application.Approvals;
 
 public sealed class ApprovalWorkflowService(ToolRegistry tools, IActionApprovalScopeValidator scopes,
-    IDateTimeProvider clock) : IApprovalWorkflowService
+    IDateTimeProvider clock, IAuditEventWriter? auditWriter = null) : IApprovalWorkflowService
 {
+    private readonly IAuditEventWriter audit = auditWriter ?? new UnavailableAuditEventWriter();
     public async Task<ApprovalOperationResult> DecideAsync(ActionScope scope, ActionDescriptor action,
         ApprovalRequest request, CancellationToken cancellationToken = default)
     {
@@ -36,9 +38,21 @@ public sealed class ApprovalWorkflowService(ToolRegistry tools, IActionApprovalS
                 return ApprovalOperationResult.Denied(ApprovalOperationStatus.Failed);
             cancellationToken.ThrowIfCancellationRequested();
             if (request.Decision == ApprovalDecision.Reject)
-                return ApprovalOperationResult.Success(action.Transition(ActionLifecycleStatus.Rejected, now), null);
+            {
+                var rejected = action.Transition(ActionLifecycleStatus.Rejected, now);
+                var result = ApprovalOperationResult.Success(rejected, null);
+                await AuditObservation.RecordAsync(audit, AuditWriteRequest.Create(
+                    AuditEventType.ApprovalRejected, AuditEventOutcome.Denied, scope,
+                    new(action.Id, action.ToolId)), cancellationToken);
+                return result;
+            }
             var evidence = ApprovalEvidence.Issue(action, now);
-            return ApprovalOperationResult.Success(action.Approve(evidence), evidence);
+            var approved = action.Approve(evidence);
+            var approvedResult = ApprovalOperationResult.Success(approved, evidence);
+            await AuditObservation.RecordAsync(audit, AuditWriteRequest.Create(
+                AuditEventType.ApprovalGranted, AuditEventOutcome.Success, scope,
+                new(action.Id, action.ToolId, ApprovalId: evidence.Id.Value)), cancellationToken);
+            return approvedResult;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception) { return ApprovalOperationResult.Denied(ApprovalOperationStatus.Failed); }

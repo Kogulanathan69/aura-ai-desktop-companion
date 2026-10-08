@@ -163,7 +163,8 @@ internal static class ApprovalChecks
             approved.ToolExecutionId is null && approved.VerificationId is null && !approved.IsVerified,
             "11P approval leaves tools disabled/uninvoked and action unexecuted/unverified");
         check(typeof(ApprovalWorkflowService).GetConstructors().Single().GetParameters().Select(x => x.ParameterType).SequenceEqual(
-            new[] { typeof(ToolRegistry), typeof(IActionApprovalScopeValidator), typeof(IDateTimeProvider) }),
+            new[] { typeof(ToolRegistry), typeof(IActionApprovalScopeValidator), typeof(IDateTimeProvider),
+                typeof(Aura.Application.Auditing.IAuditEventWriter) }),
             "11P no dispatcher/provider/database/persistence/OS dependency");
         foreach (var type in new[] { typeof(AiChatService), typeof(AiProviderRouter) })
             check(type.GetConstructors().Single().GetParameters().All(x => x.ParameterType.Namespace != typeof(IApprovalWorkflowService).Namespace),

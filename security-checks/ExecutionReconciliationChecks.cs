@@ -187,7 +187,8 @@ internal static class ExecutionReconciliationChecks
         check(typeof(ExecutionReconciliationService).GetConstructors().Single().GetParameters()
                 .Select(x => x.ParameterType).SequenceEqual(
                     [typeof(IExecutionReconciliationScopeValidator), typeof(IExecutionReconciliationSource),
-                        typeof(IExecutionReconciliationPolicy), typeof(IDateTimeProvider)]) &&
+                        typeof(IExecutionReconciliationPolicy), typeof(IDateTimeProvider),
+                        typeof(Aura.Application.Auditing.IAuditEventWriter)]) &&
             typeof(AiChatRequest).GetProperties().Select(x => x.Name).SequenceEqual(["Prompt"]) &&
             new[] { typeof(AiChatService), typeof(AiProviderRouter) }.All(type =>
                 type.GetConstructors().Single().GetParameters().All(parameter =>

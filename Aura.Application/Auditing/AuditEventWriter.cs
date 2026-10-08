@@ -2,9 +2,24 @@ using Aura.Application.Common.Interfaces;
 
 namespace Aura.Application.Auditing;
 
-// Explicit boundary only. No action/approval/execution/verification/reconciliation
-// workflow calls this writer automatically in Step 11W.
-public sealed class AuditEventWriter(IAuditEventSink sink, IDateTimeProvider clock)
+public interface IAuditEventWriter
+{
+    Task<AuditWriteResult> WriteAsync(AuditWriteRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+// Default workflow boundary: no sink, no persistence claim.
+public sealed class UnavailableAuditEventWriter : IAuditEventWriter
+{
+    public Task<AuditWriteResult> WriteAsync(AuditWriteRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(AuditWriteResult.Denied(AuditWriteStatus.Unavailable));
+    }
+}
+
+public sealed class AuditEventWriter(IAuditEventSink sink, IDateTimeProvider clock) : IAuditEventWriter
 {
     public async Task<AuditWriteResult> WriteAsync(AuditWriteRequest request,
         CancellationToken cancellationToken = default)
@@ -29,5 +44,21 @@ public sealed class AuditEventWriter(IAuditEventSink sink, IDateTimeProvider clo
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception) { return AuditWriteResult.Denied(AuditWriteStatus.Failed); }
+    }
+}
+
+internal static class AuditObservation
+{
+    internal static async Task RecordAsync(IAuditEventWriter writer, AuditWriteRequest request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            _ = await writer.WriteAsync(request, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception) { /* Audit is observational; no retry or business-result change. */ }
     }
 }

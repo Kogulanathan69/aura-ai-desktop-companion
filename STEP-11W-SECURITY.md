@@ -1,5 +1,10 @@
 # Step 11W — Audit trail and security-event foundation
 
+> Step 11X later integrated bounded audit observations into the approval,
+> permission, execution, reconciliation, and verification workflows. The
+> no-workflow-integration statements below describe the historical Step 11W state;
+> see `STEP-11X-SECURITY.md` for current behavior.
+
 ## Scope and relationship to existing AuditLog
 
 This step adds a bounded Application-layer event model, validation policy, explicit writer, and sink interface. No action, approval, permission, execution, reconciliation, or verification workflow calls the writer automatically. The supplied sink returns Unavailable; it neither persists nor claims to persist an event. No production sink or database adapter is registered. The existing domain `AuditLog` has free-text `Description`, `OldValue`, `NewValue`, `EntityType`, and string status fields, so mapping the bounded model to that entity requires a separate reviewed adapter. Its entity, EF configuration, and schema are unchanged. This foundation is not production audit logging, tamper resistance, immutable database history, or complete compliance logging.

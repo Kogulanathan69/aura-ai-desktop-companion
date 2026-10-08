@@ -1,5 +1,6 @@
 using Aura.Application.Actions;
 using Aura.Application.Common.Interfaces;
+using Aura.Application.Auditing;
 
 namespace Aura.Application.Executions;
 
@@ -7,8 +8,9 @@ namespace Aura.Application.Executions;
 // or a durable-state mutation method.
 public sealed class ExecutionReconciliationService(IExecutionReconciliationScopeValidator scopes,
     IExecutionReconciliationSource source, IExecutionReconciliationPolicy policy,
-    IDateTimeProvider clock) : IExecutionReconciliationService
+    IDateTimeProvider clock, IAuditEventWriter? auditWriter = null) : IExecutionReconciliationService
 {
+    private readonly IAuditEventWriter audit = auditWriter ?? new UnavailableAuditEventWriter();
     public async Task<ExecutionReconciliationResult> ReconcileAsync(ActionScope scope,
         ExecutionReconciliationRequest request, CancellationToken cancellationToken = default)
     {
@@ -57,8 +59,14 @@ public sealed class ExecutionReconciliationService(IExecutionReconciliationScope
             var issuedAt = clock.UtcNow;
             if (issuedAt.Kind != DateTimeKind.Utc || issuedAt == default)
                 return ExecutionReconciliationResult.Denied(ExecutionReconciliationStatus.Failed);
-            return ExecutionReconciliationResult.Success(
-                ExecutionReconciliationEvidence.Issue(snapshot, disposition, issuedAt));
+            var evidence = ExecutionReconciliationEvidence.Issue(snapshot, disposition, issuedAt);
+            var result = ExecutionReconciliationResult.Success(evidence);
+            await AuditObservation.RecordAsync(audit, AuditWriteRequest.Create(
+                AuditEventType.ExecutionReconciliationAssessed,
+                AuditEventOutcome.Inconclusive, scope,
+                new(snapshot.ActionId, snapshot.ToolId, snapshot.ApprovalId,
+                    snapshot.ExecutionId, ReconciliationId: evidence.Id.Value)), cancellationToken);
+            return result;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception) { return ExecutionReconciliationResult.Denied(ExecutionReconciliationStatus.Failed); }
