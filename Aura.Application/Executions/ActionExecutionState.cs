@@ -35,7 +35,7 @@ public sealed class ExecutionAttemptIdentifier
 {
     public Guid Value { get; }
     private ExecutionAttemptIdentifier(Guid value) => Value = value;
-    public static ExecutionAttemptIdentifier CreateForTrustedWorkflow() => new(Guid.NewGuid());
+    internal static ExecutionAttemptIdentifier CreateForTrustedWorkflow() => new(Guid.NewGuid());
 }
 
 public sealed record ReserveExecutionRequest(ActionIdentifier ActionId, ActionScope Scope,
@@ -83,6 +83,10 @@ public sealed class ActionExecutionStateResult
 
 public interface IActionExecutionStateStore
 {
+    // Atomically create the exact Ready version-0 state if absent, then reserve it.
+    // An existing row must be checked under the same transaction/CAS operation.
+    Task<ActionExecutionStateResult> TryReserveInitialAsync(ActionExecutionState ready,
+        ExecutionAttemptIdentifier executionId, CancellationToken cancellationToken);
     Task<ActionExecutionStateResult> TryReserveAsync(ReserveExecutionRequest request,
         CancellationToken cancellationToken);
     Task<ActionExecutionStateResult> TryCompleteAsync(CompleteExecutionRequest request,
@@ -91,6 +95,13 @@ public interface IActionExecutionStateStore
 
 public sealed class UnavailableActionExecutionStateStore : IActionExecutionStateStore
 {
+    public Task<ActionExecutionStateResult> TryReserveInitialAsync(ActionExecutionState ready,
+        ExecutionAttemptIdentifier executionId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(ActionExecutionStateResult.Denied(ActionExecutionStateResultStatus.Unavailable));
+    }
+
     public Task<ActionExecutionStateResult> TryReserveAsync(ReserveExecutionRequest request,
         CancellationToken cancellationToken)
     {

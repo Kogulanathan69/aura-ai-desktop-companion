@@ -2,6 +2,7 @@ using Aura.Application.Actions;
 using Aura.Application.Approvals;
 using Aura.Application.Executions;
 using Aura.Application.Tools;
+using System.Reflection;
 
 internal static class ExecutionStateChecks
 {
@@ -18,8 +19,8 @@ internal static class ExecutionStateChecks
         check(ActionExecutionState.CreateReady(null, approval) is null &&
             ActionExecutionState.CreateReady(action, null) is null,
             "11S initial state requires approved action and evidence");
-        var id = ExecutionAttemptIdentifier.CreateForTrustedWorkflow();
-        var otherId = ExecutionAttemptIdentifier.CreateForTrustedWorkflow();
+        var id = NewFixtureAttemptId();
+        var otherId = NewFixtureAttemptId();
         var reserve = new ReserveExecutionRequest(action.Id, action.Scope, action.ToolId,
             approval.Id.Value, 0, id);
         static ActionExecutionStateResultStatus R(ActionExecutionState? s, ReserveExecutionRequest q) =>
@@ -136,7 +137,17 @@ internal static class ExecutionStateChecks
         check(typeof(ExecutionRequest).GetProperties().Select(x => x.Name).SequenceEqual(new[] { "ActionId" }) &&
             typeof(ExecutionAttemptIdentifier).GetConstructors().Length == 0,
             "11S public execution request cannot supply execution attempt ID");
+        check(typeof(ExecutionAttemptIdentifier).GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .All(method => method.ReturnType != typeof(ExecutionAttemptIdentifier)),
+            "11T attempt identifier has no public static minting factory");
     }
+
+    // Test-only reflection supplies IDs to the pure state policy without adding a
+    // production factory or granting security-checks Application internals access.
+    private static ExecutionAttemptIdentifier NewFixtureAttemptId() =>
+        (ExecutionAttemptIdentifier)typeof(ExecutionAttemptIdentifier).GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic, null, [typeof(Guid)], null)!
+            .Invoke([Guid.NewGuid()]);
 
     private sealed class AtomicFakeStore(ActionExecutionState initial) : IActionExecutionStateStore
     {
@@ -144,6 +155,13 @@ internal static class ExecutionStateChecks
         public ActionExecutionState State { get; private set; } = initial;
         public int Mutations { get; private set; }
         public int HandlerCalls => 0;
+
+        public Task<ActionExecutionStateResult> TryReserveInitialAsync(ActionExecutionState ready,
+            ExecutionAttemptIdentifier executionId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(ActionExecutionStateResult.Denied(ActionExecutionStateResultStatus.Unavailable));
+        }
 
         public Task<ActionExecutionStateResult> TryReserveAsync(ReserveExecutionRequest request, CancellationToken cancellationToken)
         {

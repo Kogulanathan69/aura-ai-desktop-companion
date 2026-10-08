@@ -6,13 +6,16 @@ using Aura.Application.Tools;
 namespace Aura.Application.Executions;
 
 public sealed class TrustedToolExecutionService(ToolRegistry tools, IToolExecutionScopeValidator scopes,
-    IToolExecutionPermissionValidator permissions, IToolExecutionPolicy policy, IDateTimeProvider clock)
+    IToolExecutionPermissionValidator permissions, IToolExecutionPolicy policy, IDateTimeProvider clock,
+    IActionExecutionStateStore states)
     : ITrustedToolExecutionService
 {
     public async Task<ExecutionOperationResult> ExecuteAsync(ActionScope scope, ActionDescriptor action,
         ApprovalEvidence approval, ExecutionRequest request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var reserved = false;
+        var reservationAttempted = false;
         try
         {
             if (scope is null || scope.UserId == Guid.Empty || scope.ConversationId == Guid.Empty || scope.ProjectId == Guid.Empty ||
@@ -43,7 +46,28 @@ public sealed class TrustedToolExecutionService(ToolRegistry tools, IToolExecuti
             var startedAt = clock.UtcNow;
             if (startedAt.Kind != DateTimeKind.Utc || startedAt == default || startedAt < action.UpdatedAt)
                 return ExecutionOperationResult.Denied(ExecutionOperationStatus.Failed);
-            var context = TrustedExecutionContext.Issue(action, approval, startedAt);
+            var ready = ActionExecutionState.CreateReady(action, approval);
+            if (ready is null || states is null)
+                return ExecutionOperationResult.Denied(ExecutionOperationStatus.StateUnavailable);
+            var attempt = ExecutionAttemptIdentifier.CreateForTrustedWorkflow();
+            reservationAttempted = true;
+            var reservation = await states.TryReserveInitialAsync(ready, attempt, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (reservation is null)
+                return ExecutionOperationResult.Denied(ExecutionOperationStatus.ReconciliationRequired);
+            if (reservation.Status != ActionExecutionStateResultStatus.Success)
+                return ExecutionOperationResult.Denied(MapReservationStatus(reservation.Status));
+            reserved = true;
+            var reservedState = reservation.State;
+            if (reservedState is null || !ActionExecutionStatePolicy.IsValid(reservedState) ||
+                reservedState.Status != ActionExecutionStateStatus.Reserved ||
+                reservedState.ActionId != action.Id || reservedState.Scope != scope ||
+                reservedState.ToolId != action.ToolId || reservedState.ApprovalId != approval.Id.Value ||
+                reservedState.ExecutionId != attempt.Value ||
+                reservedState.ApprovalConsumedByExecutionId != attempt.Value ||
+                reservedState.Version != 1)
+                return ExecutionOperationResult.Denied(ExecutionOperationStatus.ReconciliationRequired);
+            var context = TrustedExecutionContext.Issue(action, approval, attempt, startedAt);
             var executing = action.BeginExecution(context);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -61,12 +85,40 @@ public sealed class TrustedToolExecutionService(ToolRegistry tools, IToolExecuti
                 ? ExecutionOutcome.Succeeded : ExecutionOutcome.Failed;
             var completedAt = clock.UtcNow;
             if (completedAt.Kind != DateTimeKind.Utc || completedAt < context.StartedAt)
-                return ExecutionOperationResult.Denied(ExecutionOperationStatus.Failed);
+                return ExecutionOperationResult.Denied(ExecutionOperationStatus.ReconciliationRequired);
             cancellationToken.ThrowIfCancellationRequested();
+            var completion = await states.TryCompleteAsync(new(action.Id, scope, action.ToolId,
+                approval.Id.Value, attempt, reservedState.Version, outcome), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var completedState = completion?.State;
+            if (completion?.Status != ActionExecutionStateResultStatus.Success ||
+                completedState is null || !ActionExecutionStatePolicy.IsValid(completedState) ||
+                completedState.ActionId != action.Id || completedState.Scope != scope ||
+                completedState.ToolId != action.ToolId || completedState.ApprovalId != approval.Id.Value ||
+                completedState.ExecutionId != attempt.Value ||
+                completedState.ApprovalConsumedByExecutionId != attempt.Value ||
+                completedState.Version != reservedState.Version + 1 ||
+                completedState.Outcome != outcome ||
+                completedState.Status != (outcome == ExecutionOutcome.Succeeded
+                    ? ActionExecutionStateStatus.Succeeded : ActionExecutionStateStatus.Failed))
+                return ExecutionOperationResult.Denied(ExecutionOperationStatus.ReconciliationRequired);
             var evidence = ExecutionEvidence.Issue(context, outcome, completedAt);
             return ExecutionOperationResult.Complete(executing.CompleteExecution(evidence), evidence);
         }
         catch (OperationCanceledException) { throw; }
-        catch (Exception) { return ExecutionOperationResult.Denied(ExecutionOperationStatus.Failed); }
+        catch (Exception) { return ExecutionOperationResult.Denied(reserved || reservationAttempted
+            ? ExecutionOperationStatus.ReconciliationRequired : ExecutionOperationStatus.Failed); }
     }
+
+    private static ExecutionOperationStatus MapReservationStatus(ActionExecutionStateResultStatus status) => status switch
+    {
+        ActionExecutionStateResultStatus.InvalidRequest => ExecutionOperationStatus.InvalidRequest,
+        ActionExecutionStateResultStatus.ScopeMismatch => ExecutionOperationStatus.ScopeDenied,
+        ActionExecutionStateResultStatus.ApprovalMismatch => ExecutionOperationStatus.ApprovalDenied,
+        ActionExecutionStateResultStatus.ToolMismatch => ExecutionOperationStatus.UnknownTool,
+        ActionExecutionStateResultStatus.StaleVersion or ActionExecutionStateResultStatus.AlreadyReserved or
+            ActionExecutionStateResultStatus.AlreadyCompleted or ActionExecutionStateResultStatus.ExecutionMismatch
+            => ExecutionOperationStatus.StateConflict,
+        _ => ExecutionOperationStatus.StateUnavailable
+    };
 }

@@ -34,15 +34,17 @@ internal static class ExecutionChecks
         var approval = approvalResult.Evidence!;
         var permission = new PermissionFixture(toolId!);
         var policy = new PolicyFixture(toolId!);
-        var service = new TrustedToolExecutionService(tools, owner, permission, policy, clock);
+        var stateStore = new AtomicExecutionStore();
+        var service = new TrustedToolExecutionService(tools, owner, permission, policy, clock, stateStore);
+        TrustedToolExecutionService FreshService() => new(tools, owner, permission, policy, clock, new AtomicExecutionStore());
         var request = new ExecutionRequest(approved.Id);
         var otherProposed = (await lifecycle.ProposeAsync(scope, new(toolId!, "Other action"))).Action!;
         await ExecutionStateChecks.RunAsync(check, approved, approval, alternateId!, otherProposed.Id);
 
-        check((await new TrustedToolExecutionService(tools, owner, new DenyToolExecutionPermissionValidator(), policy, clock)
+        check((await new TrustedToolExecutionService(tools, owner, new DenyToolExecutionPermissionValidator(), policy, clock, new AtomicExecutionStore())
             .ExecuteAsync(scope, approved, approval, request)).Status == ExecutionOperationStatus.PermissionDenied && handler.Calls == 0,
             "11R supplied permission boundary denies before handler");
-        check((await new TrustedToolExecutionService(tools, owner, permission, new DenyToolExecutionPolicy(), clock)
+        check((await new TrustedToolExecutionService(tools, owner, permission, new DenyToolExecutionPolicy(), clock, new AtomicExecutionStore())
             .ExecuteAsync(scope, approved, approval, request)).Status == ExecutionOperationStatus.PolicyDenied && handler.Calls == 0,
             "11R supplied execution policy denies before handler");
         check(!tool.Enabled && (await new DisabledToolDispatcher(tools).ExecuteAsync(new(toolId!))).Status == ToolExecutionStatus.Disabled,
@@ -121,7 +123,7 @@ internal static class ExecutionChecks
             !evidence.MatchesBinding(approved.Id, scope, alternateId, approval.Id.Value) &&
             !evidence.MatchesBinding(approved.Id, scope, toolId, otherApproval.Evidence!.Id.Value),
             "11R evidence cannot bind another action/tool/approval");
-        check((await new TrustedToolExecutionService(new ToolRegistry([]), owner, permission, policy, clock)
+        check((await new TrustedToolExecutionService(new ToolRegistry([]), owner, permission, policy, clock, new AtomicExecutionStore())
             .ExecuteAsync(scope, approved, approval, request)).Status == ExecutionOperationStatus.UnknownTool,
             "11R unregistered tool fails closed");
         owner.Allow = false;
@@ -143,19 +145,19 @@ internal static class ExecutionChecks
         owner.RevokeSecond = false;
         handler.Result = ToolExecutionResult.FromStatus(ToolExecutionStatus.Failed);
         beforeOwner = handler.Calls;
-        result = await service.ExecuteAsync(scope, approved, approval, request);
+        result = await FreshService().ExecuteAsync(scope, approved, approval, request);
         check(result.Status == ExecutionOperationStatus.ExecutionFailed && result.Action?.Status == ActionLifecycleStatus.Failed &&
             result.Evidence?.Outcome == ExecutionOutcome.Failed && handler.Calls == beforeOwner + 1 && alternate.Calls == 0,
             "11R safe handler failure maps Failed, exactly one call, no retry/fallback");
         handler.ThrowFailure = true;
         beforeOwner = handler.Calls;
-        result = await service.ExecuteAsync(scope, approved, approval, request);
+        result = await FreshService().ExecuteAsync(scope, approved, approval, request);
         check(result.Status == ExecutionOperationStatus.ExecutionFailed && result.Message == "Tool call failed." &&
             result.Evidence?.Outcome == ExecutionOutcome.Failed && handler.Calls == beforeOwner + 1,
             "11R thrown handler exception mapped to fixed safe failure without retry");
         handler.ThrowFailure = false;
         handler.Result = ToolExecutionResult.FromStatus((ToolExecutionStatus)999);
-        result = await service.ExecuteAsync(scope, approved, approval, request);
+        result = await FreshService().ExecuteAsync(scope, approved, approval, request);
         check(result.Status == ExecutionOperationStatus.ExecutionFailed && result.Evidence?.Outcome == ExecutionOutcome.Failed,
             "11R invalid handler status fails closed");
         handler.Result = ToolExecutionResult.FromStatus(ToolExecutionStatus.Success);
@@ -173,7 +175,7 @@ internal static class ExecutionChecks
             policy.CancelAndDeny = stage == "policy" ? during : null;
             handler.CancelAfterCall = stage == "handler" ? during : null;
             beforeOwner = handler.Calls; observed = false;
-            try { await service.ExecuteAsync(scope, approved, approval, request, during.Token); }
+            try { await FreshService().ExecuteAsync(scope, approved, approval, request, during.Token); }
             catch (OperationCanceledException) { observed = true; }
             check(observed && (stage == "handler" || handler.Calls == beforeOwner),
                 "11R cancellation propagates at " + stage + " without fabricated completion");
@@ -181,7 +183,7 @@ internal static class ExecutionChecks
         owner.CancelAndDeny = permission.CancelAndDeny = policy.CancelAndDeny = handler.CancelAfterCall = null;
         handler.ThrowCancellation = true;
         observed = false;
-        try { await service.ExecuteAsync(scope, approved, approval, request); }
+        try { await FreshService().ExecuteAsync(scope, approved, approval, request); }
         catch (OperationCanceledException) { observed = true; }
         check(observed, "11R handler cancellation exception propagates");
         handler.ThrowCancellation = false;
@@ -191,19 +193,22 @@ internal static class ExecutionChecks
                 "11R fixed bounded denial result " + status);
         check(ExecutionOperationResult.Denied(ExecutionOperationStatus.Success).Status == ExecutionOperationStatus.Failed,
             "11R public result factory cannot fabricate success");
+        beforeOwner = handler.Calls;
         var repeated = await service.ExecuteAsync(scope, approved, approval, request);
-        check(repeated.Status == ExecutionOperationStatus.Success && repeated.Evidence!.Id.Value != evidence.Id.Value,
-            "11R stale Approved replay not durably prevented; each call gets new execution ID");
+        check(repeated.Status == ExecutionOperationStatus.StateConflict && repeated.Evidence is null &&
+            stateStore.Reservations == 1 && handler.Calls == beforeOwner,
+            "11T stale Approved replay is denied without another handler call");
         check(typeof(TrustedToolExecutionService).GetConstructors().Single().GetParameters().Select(x => x.ParameterType).SequenceEqual(
             new[] { typeof(ToolRegistry), typeof(IToolExecutionScopeValidator), typeof(IToolExecutionPermissionValidator),
-                typeof(IToolExecutionPolicy), typeof(IDateTimeProvider) }),
-            "11R coordinator has no DB/provider/OS/verification/dispatcher dependency");
+                typeof(IToolExecutionPolicy), typeof(IDateTimeProvider), typeof(IActionExecutionStateStore) }),
+            "11T coordinator depends on state store but no DB/provider/OS/verification/dispatcher");
         foreach (var type in new[] { typeof(AiChatService), typeof(AiProviderRouter) })
             check(type.GetConstructors().Single().GetParameters().All(x => x.ParameterType.Namespace != typeof(ITrustedToolExecutionService).Namespace),
                 "11R " + type.Name + " remains execution-free");
         check(typeof(AiChatRequest).GetProperties().Select(x => x.Name).SequenceEqual(new[] { "Prompt" }),
             "11R public chat request remains Prompt-only");
         check(!new ProjectFileAccessOptions().Enabled, "11R Safe File Access remains disabled");
+        await ExecutionIntegrationChecks.RunAsync(check);
     }
 
     private sealed class HandlerFixture : IToolHandler
