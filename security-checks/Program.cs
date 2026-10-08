@@ -35,6 +35,7 @@ await RuntimeSafetyChecks.RunAsync(Check);
 await PersistenceFoundationChecks.RunAsync(Check);
 await CurrentUserRuntimeChecks.RunAsync(Check);
 await AuthenticatedUserMappingChecks.RunAsync(Check);
+await UserIdentityHardeningChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();

@@ -1,56 +1,47 @@
+using Aura.Application.Actions;
 using Aura.Application.Common.Interfaces;
-using Microsoft.EntityFrameworkCore;
 
 namespace Aura.Application.Common.Services;
 
 public sealed class UserIdentityService : IUserIdentityService
 {
-    private readonly IAuraDbContext _dbContext;
+    private readonly IAuthenticatedUserMappingSource _mappingSource;
     private readonly ICurrentUserService _currentUserService;
 
-    public UserIdentityService(
-        IAuraDbContext dbContext,
+    public UserIdentityService(IAuthenticatedUserMappingSource mappingSource,
         ICurrentUserService currentUserService)
     {
-        _dbContext = dbContext;
+        _mappingSource = mappingSource;
         _currentUserService = currentUserService;
     }
 
-    public async Task<Guid> GetCurrentUserIdAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<Guid> GetCurrentUserIdAsync(CancellationToken cancellationToken = default)
     {
-        if (!_currentUserService.IsAuthenticated)
+        cancellationToken.ThrowIfCancellationRequested();
+        try
         {
-            throw new UnauthorizedAccessException(
-                "An authenticated user is required.");
+            if (!_currentUserService.IsAuthenticated)
+                throw new UnauthorizedAccessException("An authenticated user is required.");
+
+            var authUserId = _currentUserService.AuthUserId;
+            if (string.IsNullOrWhiteSpace(authUserId) ||
+                !Guid.TryParse(authUserId, out var authUserGuid) || authUserGuid == Guid.Empty)
+                throw new UnauthorizedAccessException("Authenticated user identifier is invalid.");
+
+            var mapping = await _mappingSource.GetAsync(authUserGuid, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (mapping is not null && mapping.Status == AuthenticatedUserMappingStatus.Found &&
+                mapping.AuthUserId == authUserGuid && mapping.UserId != Guid.Empty)
+                return mapping.UserId;
         }
-
-        var authUserId = _currentUserService.AuthUserId;
-
-        if (string.IsNullOrWhiteSpace(authUserId))
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            throw new UnauthorizedAccessException(
-                "Authenticated user identifier is missing.");
+            throw;
         }
-
-        if (!Guid.TryParse(authUserId, out var authUserGuid))
+        catch (Exception)
         {
-            throw new UnauthorizedAccessException(
-                "Authenticated user identifier is invalid.");
+            cancellationToken.ThrowIfCancellationRequested();
         }
-
-        var userId = await _dbContext.Users
-            .AsNoTracking()
-            .Where(x => x.AuthUserId == authUserGuid)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (userId is null)
-        {
-            throw new UnauthorizedAccessException(
-                "Authenticated user is not registered in AURA.");
-        }
-
-        return userId.Value;
+        throw new UnauthorizedAccessException("Authenticated user is unavailable.");
     }
 }

@@ -29,6 +29,7 @@ using Microsoft.EntityFrameworkCore;
 using Aura.Api.Endpoints;
 using Aura.Api.Security;
 using Aura.Application.Security;
+using Aura.Application.Actions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -82,6 +83,7 @@ builder.Services.AddSingleton<IProjectFileContentReader, ProjectFileContentReade
 builder.Services.AddScoped<IProjectContextService, ProjectContextService>();
 builder.Services.AddSingleton<IPrivacyGuard, PrivacyGuard>();
 builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
+builder.Services.AddScoped<IAuthenticatedUserMappingSource, AuthenticatedUserMappingSource>();
 
 // Current User
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
