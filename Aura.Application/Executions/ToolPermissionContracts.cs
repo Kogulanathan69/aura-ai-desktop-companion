@@ -17,6 +17,8 @@ public sealed record ToolPermissionLookupResult(ToolPermissionLookupStatus Statu
 
 public interface IToolPermissionSource
 {
+    // Future adapter: current exact scope/tool/requirement only; no wildcard,
+    // inherited role, cached grant, or automatic grant. Revocation must be current.
     Task<ToolPermissionLookupResult> GetAsync(ToolPermissionValidationRequest request,
         CancellationToken cancellationToken);
 }
