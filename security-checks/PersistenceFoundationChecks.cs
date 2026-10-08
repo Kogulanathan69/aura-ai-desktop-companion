@@ -81,11 +81,13 @@ public class OwnershipContextProxy : DispatchProxy
     internal DbSet<Conversation> Conversations { get; set; } = null!;
     internal DbSet<Project> Projects { get; set; } = null!;
     internal bool FailRead { get; set; }
+    internal bool FailUserRead { get; set; }
+    internal int UserReads { get; private set; }
     internal int ConversationReads { get; private set; }
     internal int Saves { get; private set; }
     protected override object? Invoke(MethodInfo? method, object?[]? args) => method?.Name switch
     {
-        "get_Users" => Users,
+        "get_Users" => ReadUsers(),
         "get_Projects" => Projects,
         "get_Conversations" => ReadConversations(),
         "SaveChangesAsync" => Save(),
@@ -96,6 +98,12 @@ public class OwnershipContextProxy : DispatchProxy
         ConversationReads++;
         if (FailRead) throw new InvalidOperationException("Synthetic private DB error.");
         return Conversations;
+    }
+    private DbSet<User> ReadUsers()
+    {
+        UserReads++;
+        if (FailUserRead) throw new InvalidOperationException("Synthetic private DB error.");
+        return Users;
     }
     private Task<int> Save() { Saves++; return Task.FromResult(1); }
 }

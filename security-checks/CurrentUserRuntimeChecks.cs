@@ -12,7 +12,8 @@ internal static class CurrentUserRuntimeChecks
     public static async Task RunAsync(Action<bool, string> check)
     {
         var accessor = new CountingHttpContextAccessor();
-        var current = new HttpCurrentUserContext(accessor);
+        var current = new HttpCurrentUserContext(accessor,
+            new UnavailableAuthenticatedUserMappingSource());
         var internalUser = Guid.NewGuid();
         var subject = Guid.NewGuid();
         static HttpContext Context(bool authenticated, params Claim[] claims)
@@ -48,7 +49,8 @@ internal static class CurrentUserRuntimeChecks
         accessor.Context = null;
         check(await IsUnavailable(), "12B absent HttpContext unavailable");
         check(accessor.Reads >= 9 && typeof(HttpCurrentUserContext).GetConstructors().Single()
-                .GetParameters().Select(x => x.ParameterType).SequenceEqual([typeof(IHttpContextAccessor)]) &&
+                .GetParameters().Select(x => x.ParameterType).SequenceEqual([
+                    typeof(IHttpContextAccessor), typeof(IAuthenticatedUserMappingSource)]) &&
             typeof(CurrentUserSnapshot).GetProperties().Select(x => x.Name)
                 .SequenceEqual(["UserId", "Status"]),
             "12B fresh request read per call and bounded snapshot; no database dependency");

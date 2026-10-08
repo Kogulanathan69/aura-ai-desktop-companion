@@ -2,12 +2,12 @@ using Aura.Application.Actions;
 
 namespace Aura.Api.Services;
 
-// Foundation only; deliberately unregistered. The existing JWT "sub" is
-// User.AuthUserId, while ActionScope.UserId requires User.Id. No database lookup
-// or untrusted claim-to-internal-ID assumption belongs in this request adapter.
-public sealed class HttpCurrentUserContext(IHttpContextAccessor accessor) : ICurrentUserContext
+// Foundation only; deliberately unregistered. The existing JWT "sub" maps through
+// a bounded source to internal User.Id; this request adapter performs no DB query.
+public sealed class HttpCurrentUserContext(IHttpContextAccessor accessor,
+    IAuthenticatedUserMappingSource mapping) : ICurrentUserContext
 {
-    public Task<CurrentUserSnapshot> GetAsync(CancellationToken cancellationToken)
+    public async Task<CurrentUserSnapshot> GetAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -16,17 +16,26 @@ public sealed class HttpCurrentUserContext(IHttpContextAccessor accessor) : ICur
             if (principal?.Identity?.IsAuthenticated != true)
                 return Unavailable();
 
+            var authenticatedIdentities = principal.Identities
+                .Where(identity => identity.IsAuthenticated).Take(2).ToArray();
+            if (authenticatedIdentities.Length != 1)
+                return Unavailable();
+
             // The repository's JWT bearer mapping disables inbound claim remapping.
             // Require one canonical subject; never fall back to roles, email, or headers.
             var subjects = principal.FindAll("sub").Take(2).ToArray();
-            if (subjects.Length != 1 || !Guid.TryParse(subjects[0].Value, out var subject) ||
+            if (subjects.Length != 1 ||
+                !ReferenceEquals(subjects[0].Subject, authenticatedIdentities[0]) ||
+                !Guid.TryParse(subjects[0].Value, out var subject) ||
                 subject == Guid.Empty)
                 return Unavailable();
 
-            // A valid external subject is not the internal User.Id required by
-            // ExactOwnershipScopeValidator. Mapping remains a separate future step.
+            var result = await mapping.GetAsync(subject, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            return Unavailable();
+            return result is not null && result.Status == AuthenticatedUserMappingStatus.Found &&
+                result.AuthUserId == subject && result.UserId != Guid.Empty
+                ? new CurrentUserSnapshot(result.UserId, CurrentUserStatus.Authenticated)
+                : Unavailable();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -39,6 +48,6 @@ public sealed class HttpCurrentUserContext(IHttpContextAccessor accessor) : ICur
         }
     }
 
-    private static Task<CurrentUserSnapshot> Unavailable() =>
-        Task.FromResult(new CurrentUserSnapshot(Guid.Empty, CurrentUserStatus.Unavailable));
+    private static CurrentUserSnapshot Unavailable() =>
+        new(Guid.Empty, CurrentUserStatus.Unavailable);
 }
