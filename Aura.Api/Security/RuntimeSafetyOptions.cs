@@ -1,5 +1,6 @@
 using Aura.Application.AI.Providers;
 using Aura.Application.ProjectFiles.Content;
+using Aura.Application.Security;
 using Aura.Infrastructure.AI.OpenAI;
 
 namespace Aura.Api.Security;
@@ -13,22 +14,6 @@ public sealed class RuntimeSafetyOptions
     public bool SafeFileAccessEnabled { get; init; } = false;
     public bool CloudAiEnabled { get; init; } = false;
     public bool AuditPersistenceEnabled { get; init; } = false;
-}
-
-// Explicit readiness claims must come from future reviewed registrations, not DI inspection.
-public sealed record RuntimeCapabilitySnapshot(bool Ownership, bool Permission, bool ExecutionState,
-    bool AuditSink, bool Reconciliation, bool Verification, bool Handler, bool ExecutionPolicy,
-    bool SafeFileAccess);
-
-public interface IRuntimeCapabilityReadiness
-{
-    RuntimeCapabilitySnapshot GetSnapshot();
-}
-
-public sealed class UnavailableRuntimeCapabilityReadiness : IRuntimeCapabilityReadiness
-{
-    public RuntimeCapabilitySnapshot GetSnapshot() => new(false, false, false, false, false,
-        false, false, false, false);
 }
 
 public enum RuntimeSafetyStatus { SafeDisabled, Valid, InvalidConfiguration, MissingRequiredAdapter, UnsafeCombination }
