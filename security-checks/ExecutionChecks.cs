@@ -41,6 +41,7 @@ internal static class ExecutionChecks
         var otherProposed = (await lifecycle.ProposeAsync(scope, new(toolId!, "Other action"))).Action!;
         await ExecutionStateChecks.RunAsync(check, approved, approval, alternateId!, otherProposed.Id);
         await ExecutionReconciliationChecks.RunAsync(check, approved, approval, alternateId!, otherProposed.Id);
+        await ToolPermissionChecks.RunAsync(check);
 
         check((await new TrustedToolExecutionService(tools, owner, new DenyToolExecutionPermissionValidator(), policy, clock, new AtomicExecutionStore())
             .ExecuteAsync(scope, approved, approval, request)).Status == ExecutionOperationStatus.PermissionDenied && handler.Calls == 0,
