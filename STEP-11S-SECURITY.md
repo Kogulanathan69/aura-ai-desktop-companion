@@ -1,5 +1,11 @@
 # Step 11S — Durable action/execution state foundation
 
+> Step 11T later integrated this foundation into `TrustedToolExecutionService`.
+> The coordinator replay limitation described below is the historical Step 11S
+> state. See `STEP-11T-SECURITY.md` for current coordinator behavior. Step 11T
+> also added an atomic prepare-and-reserve store method; the versioned pure
+> reserve and complete policies described here remain unchanged.
+
 ## Scope and architecture
 
 This step adds only immutable Application-layer state, transition policy, and a narrow async store contract. It adds no production persistence adapter or coordinator integration. The only mutable implementation is a one-state, lock-protected fake in `security-checks`. It is not registered in production and proves only the fixture's atomic compare-and-swap behavior. No domain entity or audit record is automatically written. Clean Architecture dependency direction is unchanged.

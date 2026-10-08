@@ -18,7 +18,9 @@ public sealed class ExecutionIdentifier
 {
     public Guid Value { get; }
     private ExecutionIdentifier(Guid value) => Value = value;
-    internal static ExecutionIdentifier Create() => new(Guid.NewGuid());
+    internal static ExecutionIdentifier FromAttempt(ExecutionAttemptIdentifier attempt) =>
+        attempt is not null && attempt.Value != Guid.Empty
+            ? new(attempt.Value) : throw new InvalidOperationException("Invalid execution attempt.");
 }
 
 // Minted only after the coordinator validates scope, approval, permission and policy.
@@ -32,18 +34,21 @@ internal sealed class TrustedExecutionContext
     internal ExecutionIdentifier ExecutionId { get; }
     internal DateTime StartedAt { get; }
 
-    private TrustedExecutionContext(ActionDescriptor action, ApprovalEvidence approval, DateTime startedAt)
+    private TrustedExecutionContext(ActionDescriptor action, ApprovalEvidence approval,
+        ExecutionAttemptIdentifier attempt, DateTime startedAt)
     {
         ActionId = action.Id; Scope = action.Scope; ToolId = action.ToolId;
-        ApprovalId = approval.Id.Value; ExecutionId = ExecutionIdentifier.Create(); StartedAt = startedAt;
+        ApprovalId = approval.Id.Value; ExecutionId = ExecutionIdentifier.FromAttempt(attempt); StartedAt = startedAt;
     }
 
-    internal static TrustedExecutionContext Issue(ActionDescriptor action, ApprovalEvidence approval, DateTime startedAt)
+    internal static TrustedExecutionContext Issue(ActionDescriptor action, ApprovalEvidence approval,
+        ExecutionAttemptIdentifier attempt, DateTime startedAt)
     {
         if (!ApprovalValidation.IsBoundToApprovedAction(approval, action, action.Scope, action.ToolId) ||
-            startedAt.Kind != DateTimeKind.Utc || startedAt == default || startedAt < action.UpdatedAt)
+            attempt is null || attempt.Value == Guid.Empty || startedAt.Kind != DateTimeKind.Utc ||
+            startedAt == default || startedAt < action.UpdatedAt)
             throw new InvalidOperationException("Invalid execution context.");
-        return new(action, approval, startedAt);
+        return new(action, approval, attempt, startedAt);
     }
 
     internal bool Matches(ActionDescriptor action) => action.Id == ActionId && action.Scope == Scope &&
@@ -125,7 +130,8 @@ public sealed class DenyToolExecutionPolicy : IToolExecutionPolicy
 }
 
 public enum ExecutionOperationStatus { Success, InvalidRequest, ScopeDenied, InvalidActionState,
-    ApprovalDenied, UnknownTool, PermissionDenied, PolicyDenied, ExecutionFailed, Failed }
+    ApprovalDenied, UnknownTool, PermissionDenied, PolicyDenied, StateConflict,
+    StateUnavailable, ReconciliationRequired, ExecutionFailed, Failed }
 
 public sealed class ExecutionOperationResult
 {
@@ -150,6 +156,9 @@ public sealed class ExecutionOperationResult
         ExecutionOperationStatus.UnknownTool => new(status, "Execution tool is unavailable."),
         ExecutionOperationStatus.PermissionDenied => new(status, "Tool execution permission denied."),
         ExecutionOperationStatus.PolicyDenied => new(status, "Tool execution policy denied."),
+        ExecutionOperationStatus.StateConflict => new(status, "Execution state conflicts with this request."),
+        ExecutionOperationStatus.StateUnavailable => new(status, "Execution state is unavailable."),
+        ExecutionOperationStatus.ReconciliationRequired => new(status, "Execution completion requires reconciliation."),
         _ => new(ExecutionOperationStatus.Failed, "Execution operation failed.")
     };
 }
