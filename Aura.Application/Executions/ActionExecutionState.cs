@@ -85,6 +85,9 @@ public interface IActionExecutionStateStore
 {
     // Atomically create the exact Ready version-0 state if absent, then reserve it.
     // An existing row must be checked under the same transaction/CAS operation.
+    // Future adapter must bind action/scope/tool/approval/execution ID and version,
+    // consume one approval once, and keep terminal state consistent. It never runs
+    // handlers or performs tool side effects.
     Task<ActionExecutionStateResult> TryReserveInitialAsync(ActionExecutionState ready,
         ExecutionAttemptIdentifier executionId, CancellationToken cancellationToken);
     Task<ActionExecutionStateResult> TryReserveAsync(ReserveExecutionRequest request,

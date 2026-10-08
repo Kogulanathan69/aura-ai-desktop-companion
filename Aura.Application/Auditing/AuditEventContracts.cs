@@ -108,6 +108,9 @@ public enum AuditSinkStatus { Accepted, Unavailable, Failed }
 
 public interface IAuditEventSink
 {
+    // Accepted means responsibility for exactly this bounded record was accepted;
+    // it is not a persistence or authorization claim. Cancellation may arrive after
+    // acceptance. Application does not retry or add arbitrary payloads.
     Task<AuditSinkStatus> WriteAsync(AuditEventRecord record, CancellationToken cancellationToken);
 }
 

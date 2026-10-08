@@ -22,6 +22,8 @@ public sealed record ExecutionEvidenceInput(Guid ExecutionId, ActionIdentifier A
 
 public interface IExecutionEvidenceSource
 {
+    // Future adapter returns bounded trusted evidence for exact scope and IDs;
+    // no raw handler output and no automatic Verified claim.
     // Future adapter must attest an actual completed authorized execution, exact bindings
     // and current evidence provenance. Return null for unavailable/untrusted execution.
     // Must scope before reading, never execute a tool to manufacture evidence.

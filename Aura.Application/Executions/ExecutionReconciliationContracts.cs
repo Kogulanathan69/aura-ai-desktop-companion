@@ -26,6 +26,8 @@ public sealed record ExecutionReconciliationSnapshot(ActionExecutionState State,
 
 public interface IExecutionReconciliationSource
 {
+    // Future adapter returns current bounded state with exact action/scope/tool/
+    // approval/execution/version binding; no output, logs, exceptions, or recovery.
     Task<ExecutionReconciliationSnapshot?> GetAsync(ActionScope scope, ActionIdentifier actionId,
         CancellationToken cancellationToken);
 }
