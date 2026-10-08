@@ -37,6 +37,7 @@ internal static class ExecutionChecks
         var service = new TrustedToolExecutionService(tools, owner, permission, policy, clock);
         var request = new ExecutionRequest(approved.Id);
         var otherProposed = (await lifecycle.ProposeAsync(scope, new(toolId!, "Other action"))).Action!;
+        await ExecutionStateChecks.RunAsync(check, approved, approval, alternateId!, otherProposed.Id);
 
         check((await new TrustedToolExecutionService(tools, owner, new DenyToolExecutionPermissionValidator(), policy, clock)
             .ExecuteAsync(scope, approved, approval, request)).Status == ExecutionOperationStatus.PermissionDenied && handler.Calls == 0,
