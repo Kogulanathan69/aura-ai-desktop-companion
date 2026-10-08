@@ -28,6 +28,7 @@ await RetrievalChecks.RunAsync(Check);
 await ToolChecks.RunAsync(Check);
 await ActionChecks.RunAsync(Check);
 await ApprovalChecks.RunAsync(Check);
+await VerificationChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();
