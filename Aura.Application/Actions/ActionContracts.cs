@@ -1,5 +1,6 @@
 using Aura.Application.Tools;
 using Aura.Application.Approvals;
+using Aura.Application.Executions;
 
 namespace Aura.Application.Actions;
 
@@ -35,22 +36,24 @@ public sealed record ActionDescriptor
     public bool IsVerified => false;
     // Assigned only by the narrow Step 11P approval transition; an ID alone is not evidence.
     public Guid? ApprovalId { get; }
-    public Guid? ToolExecutionId => null;
+    public Guid? ToolExecutionId { get; }
     public Guid? VerificationId => null;
 
     internal ActionDescriptor(ActionIdentifier id, ActionScope scope, ToolIdentifier toolId,
-        string summary, ActionLifecycleStatus status, DateTime createdAt, DateTime updatedAt, Guid? approvalId = null)
+        string summary, ActionLifecycleStatus status, DateTime createdAt, DateTime updatedAt,
+        Guid? approvalId = null, Guid? toolExecutionId = null)
     {
         Id = id; Scope = scope; ToolId = toolId; Summary = summary;
         Status = status; CreatedAt = createdAt; UpdatedAt = updatedAt;
         ApprovalId = approvalId;
+        ToolExecutionId = toolExecutionId;
     }
 
     internal ActionDescriptor Transition(ActionLifecycleStatus status, DateTime updatedAt)
     {
         if (ActionTransitionPolicy.Evaluate(Status, status) != ActionOperationStatus.Success)
             throw new InvalidOperationException("Action transition denied.");
-        return new(Id, Scope, ToolId, Summary, status, CreatedAt, updatedAt, ApprovalId);
+        return new(Id, Scope, ToolId, Summary, status, CreatedAt, updatedAt, ApprovalId, ToolExecutionId);
     }
 
     internal ActionDescriptor Approve(ApprovalEvidence evidence)
@@ -59,6 +62,26 @@ public sealed record ActionDescriptor
             !evidence.MatchesBinding(Id, Scope, ToolId) || evidence.IssuedAt < UpdatedAt)
             throw new InvalidOperationException("Action approval denied.");
         return new(Id, Scope, ToolId, Summary, ActionLifecycleStatus.Approved, CreatedAt, evidence.IssuedAt, evidence.Id.Value);
+    }
+
+    internal ActionDescriptor BeginExecution(TrustedExecutionContext context)
+    {
+        if (Status != ActionLifecycleStatus.Approved || ToolExecutionId is not null ||
+            context is null || !context.Matches(this) || context.StartedAt < UpdatedAt)
+            throw new InvalidOperationException("Action execution denied.");
+        return new(Id, Scope, ToolId, Summary, ActionLifecycleStatus.Executing,
+            CreatedAt, context.StartedAt, ApprovalId, context.ExecutionId.Value);
+    }
+
+    internal ActionDescriptor CompleteExecution(ExecutionEvidence evidence)
+    {
+        if (Status != ActionLifecycleStatus.Executing || ToolExecutionId is null || evidence is null ||
+            evidence.Id.Value != ToolExecutionId || !evidence.MatchesBinding(Id, Scope, ToolId, ApprovalId ?? Guid.Empty) ||
+            evidence.StartedAt != UpdatedAt || evidence.CompletedAt < UpdatedAt)
+            throw new InvalidOperationException("Action completion denied.");
+        return new(Id, Scope, ToolId, Summary, evidence.Outcome == ExecutionOutcome.Succeeded
+            ? ActionLifecycleStatus.Succeeded : ActionLifecycleStatus.Failed,
+            CreatedAt, evidence.CompletedAt, ApprovalId, ToolExecutionId);
     }
 }
 
