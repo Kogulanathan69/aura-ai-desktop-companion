@@ -48,6 +48,7 @@ await LiveOwnershipVerificationChecks.RunAsync(Check);
 await PermissionPersistenceReadinessChecks.RunAsync(Check);
 await ExecutionStatePersistenceReadinessChecks.RunAsync(Check);
 await AuditPersistenceReadinessChecks.RunAsync(Check);
+await ReconciliationVerificationPersistenceReadinessChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();
