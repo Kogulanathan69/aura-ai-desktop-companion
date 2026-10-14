@@ -23,6 +23,13 @@ if (args.Length == 1 && args[0] == LivePermissionVerification.Command)
     return;
 }
 
+if (args.Length == 1 && args[0] == LiveExecutionStateVerification.Command)
+{
+    Environment.ExitCode = await LiveExecutionStateVerification.RunAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 var checks = 0;
 void Check(bool condition, string name)
 {
@@ -62,6 +69,7 @@ await ExactToolPermissionSchemaChecks.RunAsync(Check);
 await ToolPermissionPersistenceChecks.RunAsync(Check);
 await LivePermissionVerificationChecks.RunAsync(Check);
 await ExecutionStateAtomicStoreChecks.RunAsync(Check);
+await LiveExecutionStateVerificationChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();
