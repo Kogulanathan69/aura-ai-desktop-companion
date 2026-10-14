@@ -36,7 +36,7 @@ public sealed class SecurityAuditOutboxRecordConfiguration
                 "CK_SecurityAuditOutbox_Delivery",
                 "(\"DeliveryState\" = 0 AND \"AttemptCount\" = 0 AND \"DeliveredAt\" IS NULL) OR " +
                 "(\"DeliveryState\" = 1 AND \"AttemptCount\" > 0 AND \"DeliveredAt\" IS NOT NULL) OR " +
-                "(\"DeliveryState\" = 2 AND \"AttemptCount\" > 0)");
+                "(\"DeliveryState\" = 2 AND \"AttemptCount\" > 0 AND \"DeliveredAt\" IS NULL)");
         });
 
         builder.HasKey(x => x.Id);

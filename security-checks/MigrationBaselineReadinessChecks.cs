@@ -25,18 +25,20 @@ internal static class MigrationBaselineReadinessChecks
             "20261014000000_AddToolPermissionGrants.cs",
             "20261014000001_AddActionExecutionStates.cs",
             "20261014000002_AddSecurityPersistenceBundle.cs",
-            "20261014000003_AddSecurityAuditOutbox.cs"
+            "20261014000003_AddSecurityAuditOutbox.cs",
+            "20261014000004_HardenSecurityAuditOutboxDelivery.cs"
         };
 
         check(
             migrationFiles.SequenceEqual(expected),
-            "13G current targeted migration sequence is exact and ordered");
+            "13J current targeted migration sequence is exact and ordered");
 
         check(
             string.CompareOrdinal(expected[0], expected[1]) < 0 &&
             string.CompareOrdinal(expected[1], expected[2]) < 0 &&
-            string.CompareOrdinal(expected[2], expected[3]) < 0,
-            "13G audit outbox migration follows permission, execution-state and security persistence migrations");
+            string.CompareOrdinal(expected[2], expected[3]) < 0 &&
+            string.CompareOrdinal(expected[3], expected[4]) < 0,
+            "13J hardening follows the permission, execution-state, security-persistence and outbox migrations");
 
         var bundle = new AddSecurityPersistenceBundle();
 
