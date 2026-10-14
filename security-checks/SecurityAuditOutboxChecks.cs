@@ -107,14 +107,13 @@ internal static class SecurityAuditOutboxChecks
                 .Contains("^[a-z][a-z0-9-]{0,63}$"),
             "13G audit outbox tool format remains canonical");
 
-        check(
-            constraints["CK_SecurityAuditOutbox_Delivery"]
-                .Contains("\"DeliveryState\" = 0") &&
-            constraints["CK_SecurityAuditOutbox_Delivery"]
-                .Contains("\"AttemptCount\" = 0") &&
-            constraints["CK_SecurityAuditOutbox_Delivery"]
-                .Contains("\"DeliveredAt\" IS NULL"),
-            "13G pending outbox state requires zero attempts and no delivery timestamp");
+        var deliverySql = constraints["CK_SecurityAuditOutbox_Delivery"];
+        var expectedDeliverySql =
+            "(\"DeliveryState\" = 0 AND \"AttemptCount\" = 0 AND \"DeliveredAt\" IS NULL) OR " +
+            "(\"DeliveryState\" = 1 AND \"AttemptCount\" > 0 AND \"DeliveredAt\" IS NOT NULL) OR " +
+            "(\"DeliveryState\" = 2 AND \"AttemptCount\" > 0 AND \"DeliveredAt\" IS NULL)";
+        check(deliverySql == expectedDeliverySql,
+            "13J Pending, Delivered and Failed have exact attempt/timestamp shapes without fallback");
 
         check(
             outbox.GetForeignKeys().All(fk =>

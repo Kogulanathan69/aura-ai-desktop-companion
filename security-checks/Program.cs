@@ -146,6 +146,7 @@ await PersistenceHardeningReadinessChecks.RunAsync(Check);
 await SecurityAuditOutboxChecks.RunAsync(Check);
 await SecurityAuditOutboxDispatcherChecks.RunAsync(Check);
 await LiveAuditOutboxVerificationChecks.RunAsync(Check);
+await AuditOutboxSchemaHardeningChecks.RunAsync(Check);
 
 
 // --------------------------------------------------
