@@ -36,6 +36,13 @@ if (args.Length == 1 && args[0] == LiveExecutionStateVerification.Command)
     return;
 }
 
+if (args.Length == 1 && args[0] == LiveAuditOutboxVerification.Command)
+{
+    Environment.ExitCode = await LiveAuditOutboxVerification.RunAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 var checks = 0;
 
 void Check(bool condition, string name)
@@ -138,6 +145,7 @@ await PersistenceHardeningReadinessChecks.RunAsync(Check);
 
 await SecurityAuditOutboxChecks.RunAsync(Check);
 await SecurityAuditOutboxDispatcherChecks.RunAsync(Check);
+await LiveAuditOutboxVerificationChecks.RunAsync(Check);
 
 
 // --------------------------------------------------
