@@ -41,6 +41,7 @@ public sealed class AuditEventIdentifier
     public Guid Value { get; }
     private AuditEventIdentifier(Guid value) => Value = value;
     internal static AuditEventIdentifier Create() => new(Guid.NewGuid());
+    internal static AuditEventIdentifier RestoreTrusted(Guid value) => new(value);
 }
 
 public sealed class AuditEventRecord
@@ -58,9 +59,9 @@ public sealed class AuditEventRecord
     public Guid? PermissionGrantId { get; }
     public DateTime OccurredAt { get; }
 
-    private AuditEventRecord(AuditWriteRequest request, DateTime occurredAt)
+    private AuditEventRecord(AuditEventIdentifier id, AuditWriteRequest request, DateTime occurredAt)
     {
-        Id = AuditEventIdentifier.Create(); EventType = request.EventType;
+        Id = id; EventType = request.EventType;
         Outcome = request.Outcome; Scope = request.Scope;
         ActionId = request.References.ActionId; ToolId = request.References.ToolId;
         ApprovalId = request.References.ApprovalId; ExecutionId = request.References.ExecutionId;
@@ -74,7 +75,30 @@ public sealed class AuditEventRecord
         if (AuditEventValidation.Evaluate(request) != AuditWriteStatus.Success ||
             occurredAt.Kind != DateTimeKind.Utc || occurredAt == default)
             throw new InvalidOperationException("Invalid audit event.");
-        return new(request, occurredAt);
+        return new(AuditEventIdentifier.Create(), request, occurredAt);
+    }
+
+    // Restores only the three execution event shapes staged by the trusted outbox writer.
+    // This record conveys data, never authorization or permission to execute a tool.
+    public static AuditEventRecord? RestoreExecutionOutbox(Guid auditEventId,
+        AuditEventType eventType, AuditEventOutcome outcome, DateTime occurredAt,
+        Guid userId, Guid conversationId, Guid projectId, Guid actionId,
+        string? toolId, Guid approvalId, Guid executionId)
+    {
+        if (auditEventId == Guid.Empty || actionId == Guid.Empty ||
+            approvalId == Guid.Empty || executionId == Guid.Empty ||
+            occurredAt.Kind != DateTimeKind.Utc || occurredAt == default ||
+            eventType is not (AuditEventType.ExecutionReserved or
+                AuditEventType.ExecutionCompleted or AuditEventType.ExecutionFailed) ||
+            !ToolIdentifier.TryCreate(toolId, out var tool) || tool!.Value != toolId)
+            return null;
+        var request = AuditWriteRequest.Create(eventType, outcome,
+            new ActionScope(userId, conversationId, projectId),
+            new AuditEventReferences(ActionIdentifier.RestoreTrusted(actionId), tool,
+                approvalId, executionId));
+        return AuditEventValidation.Evaluate(request) == AuditWriteStatus.Success
+            ? new(AuditEventIdentifier.RestoreTrusted(auditEventId), request, occurredAt)
+            : null;
     }
 }
 

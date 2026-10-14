@@ -137,6 +137,7 @@ await PersistenceHardeningReadinessChecks.RunAsync(Check);
 // --------------------------------------------------
 
 await SecurityAuditOutboxChecks.RunAsync(Check);
+await SecurityAuditOutboxDispatcherChecks.RunAsync(Check);
 
 
 // --------------------------------------------------
