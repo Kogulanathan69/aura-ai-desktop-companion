@@ -3,6 +3,7 @@ using Aura.Application.Auditing;
 using Aura.Application.Security;
 using Aura.Domain.Entities;
 using Aura.Infrastructure.Data;
+using Aura.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 internal static class AuditPersistenceReadinessChecks
@@ -55,8 +56,9 @@ internal static class AuditPersistenceReadinessChecks
             .Concat(typeof(RuntimeSafetyOptions).Assembly.GetTypes())
             .Where(type => type.IsClass && !type.IsAbstract &&
                 typeof(IAuditEventSink).IsAssignableFrom(type)).ToArray();
-        check(sinks.SequenceEqual([typeof(UnavailableAuditEventSink)]),
-            "12I incompatible schema has no production audit sink adapter");
+        check(sinks.ToHashSet().SetEquals([typeof(UnavailableAuditEventSink),
+                typeof(SecurityAuditPersistenceSink)]),
+            "13E exact audit sink exists but remains unregistered");
         check(await new UnavailableAuditEventSink().WriteAsync(null!, CancellationToken.None) ==
             AuditSinkStatus.Unavailable,
             "12I default audit sink remains unavailable without a database write");
