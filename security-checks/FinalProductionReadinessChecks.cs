@@ -8,6 +8,7 @@ using Aura.Application.Tools;
 using Aura.Application.Verifications;
 using Aura.Infrastructure.AI.OpenAI;
 using Aura.Infrastructure.Data;
+using Aura.Infrastructure.Services;
 
 // Review-only decision. It is never registered in the API and cannot enable a workflow.
 internal static class FinalProductionReadinessChecks
@@ -100,8 +101,9 @@ internal static class FinalProductionReadinessChecks
                     typeof(ToolPermissionPersistenceSource)]),
             "12L read-only permission source foundation does not make production runtime ready");
         check(productionTypes.Where(type => typeof(IActionExecutionStateStore).IsAssignableFrom(type))
-                .SequenceEqual([typeof(UnavailableActionExecutionStateStore)]),
-            "12L no production execution-state store exists");
+                .ToHashSet().SetEquals([typeof(UnavailableActionExecutionStateStore),
+                    typeof(ActionExecutionStatePersistenceStore)]),
+            "13C unregistered execution-state foundation does not make production runtime ready");
         check(productionTypes.Where(type => typeof(IAuditEventSink).IsAssignableFrom(type))
                 .SequenceEqual([typeof(UnavailableAuditEventSink)]),
             "12L no production audit sink exists");
