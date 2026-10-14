@@ -105,11 +105,13 @@ internal static class FinalProductionReadinessChecks
                     typeof(ActionExecutionStatePersistenceStore)]),
             "13C unregistered execution-state foundation does not make production runtime ready");
         check(productionTypes.Where(type => typeof(IAuditEventSink).IsAssignableFrom(type))
-                .SequenceEqual([typeof(UnavailableAuditEventSink)]),
-            "12L no production audit sink exists");
+                .ToHashSet().SetEquals([typeof(UnavailableAuditEventSink),
+                    typeof(SecurityAuditPersistenceSink)]),
+            "13E unregistered audit sink does not make production runtime ready");
         check(productionTypes.Where(type => typeof(IExecutionReconciliationSource).IsAssignableFrom(type))
-                .SequenceEqual([typeof(UnavailableExecutionReconciliationSource)]),
-            "12L no production reconciliation source exists");
+                .ToHashSet().SetEquals([typeof(UnavailableExecutionReconciliationSource),
+                    typeof(ExecutionReconciliationPersistenceSource)]),
+            "13E unregistered reconciliation source does not make production runtime ready");
         check(productionTypes.Where(type => typeof(IExecutionEvidenceSource).IsAssignableFrom(type))
                 .SequenceEqual([typeof(UnavailableExecutionEvidenceSource)]),
             "12L no production verification evidence source exists");

@@ -4,6 +4,7 @@ using Aura.Application.Security;
 using Aura.Application.Verifications;
 using Aura.Domain.Entities;
 using Aura.Infrastructure.Data;
+using Aura.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 internal static class ReconciliationVerificationPersistenceReadinessChecks
@@ -15,8 +16,8 @@ internal static class ReconciliationVerificationPersistenceReadinessChecks
             .Options;
         await using var db = new AuraDbContext(options);
         var tables = db.Model.GetEntityTypes().Select(entity => entity.GetTableName()).ToHashSet();
-        check(!tables.Any(table => table?.Contains("Reconciliation", StringComparison.OrdinalIgnoreCase) == true),
-            "12J no durable reconciliation assessment table exists");
+        check(tables.Contains("ExecutionReconciliationAssessments"),
+            "13E dedicated reconciliation assessment table exists; legacy tables remain unchanged");
 
         var verification = db.Model.FindEntityType(typeof(Verification))!;
         var fields = verification.GetProperties().Select(property => property.Name).ToHashSet();
@@ -44,12 +45,13 @@ internal static class ReconciliationVerificationPersistenceReadinessChecks
             .Concat(typeof(RuntimeSafetyOptions).Assembly.GetTypes())
             .Where(type => type.IsClass && !type.IsAbstract).ToArray();
         check(implementations.Where(type => typeof(IExecutionReconciliationSource).IsAssignableFrom(type))
-                .SequenceEqual([typeof(UnavailableExecutionReconciliationSource)]) &&
+                .ToHashSet().SetEquals([typeof(UnavailableExecutionReconciliationSource),
+                    typeof(ExecutionReconciliationPersistenceSource)]) &&
             implementations.Where(type => typeof(IExecutionEvidenceSource).IsAssignableFrom(type))
                 .SequenceEqual([typeof(UnavailableExecutionEvidenceSource)]) &&
             implementations.Where(type => typeof(IIndependentVerificationPolicy).IsAssignableFrom(type))
                 .SequenceEqual([typeof(ConservativeVerificationPolicy)]),
-            "12J no production reconciliation, execution evidence, or independent proof adapter");
+            "13E unregistered reconciliation reader exists; trusted verification and proof remain unavailable");
         check(await new UnavailableExecutionReconciliationSource().GetAsync(null!, null!, CancellationToken.None) is null &&
             await new UnavailableExecutionEvidenceSource().GetAsync(null!, Guid.Empty, CancellationToken.None) is null,
             "12J default sources provide no evidence");

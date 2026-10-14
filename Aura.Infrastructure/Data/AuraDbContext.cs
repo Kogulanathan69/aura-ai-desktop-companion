@@ -32,6 +32,9 @@ public class AuraDbContext : DbContext , IAuraDbContext
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<ToolPermissionGrantRecord> ToolPermissionGrants => Set<ToolPermissionGrantRecord>();
     public DbSet<ActionExecutionStateRecord> ActionExecutionStates => Set<ActionExecutionStateRecord>();
+    public DbSet<SecurityAuditEventRecord> SecurityAuditEvents => Set<SecurityAuditEventRecord>();
+    public DbSet<ExecutionReconciliationAssessmentRecord> ExecutionReconciliationAssessments => Set<ExecutionReconciliationAssessmentRecord>();
+    public DbSet<ExecutionVerificationAssessmentRecord> ExecutionVerificationAssessments => Set<ExecutionVerificationAssessmentRecord>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Device> Devices => Set<Device>();
 
