@@ -45,8 +45,9 @@ internal static class PermissionPersistenceReadinessChecks
             .Concat(typeof(RuntimeSafetyOptions).Assembly.GetTypes())
             .Where(type => type.IsClass && !type.IsAbstract &&
                 typeof(IToolPermissionSource).IsAssignableFrom(type)).ToArray();
-        check(sourceTypes.SequenceEqual([typeof(UnavailableToolPermissionSource)]),
-            "12G no production permission persistence adapter exists for incompatible schema");
+        check(sourceTypes.ToHashSet().SetEquals([typeof(UnavailableToolPermissionSource),
+                typeof(ToolPermissionPersistenceSource)]),
+            "12G generic Permission remains incompatible; exact source is a separate unregistered foundation");
 
         ToolIdentifier.TryCreate("permission-readiness", out var toolId);
         var request = new ToolPermissionValidationRequest(

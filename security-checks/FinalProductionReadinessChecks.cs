@@ -96,8 +96,9 @@ internal static class FinalProductionReadinessChecks
                 .SequenceEqual([typeof(DenyToolExecutionPolicy)]),
             "12L only default-deny execution policy exists");
         check(productionTypes.Where(type => typeof(IToolPermissionSource).IsAssignableFrom(type))
-                .SequenceEqual([typeof(UnavailableToolPermissionSource)]),
-            "12L no production permission source exists");
+                .ToHashSet().SetEquals([typeof(UnavailableToolPermissionSource),
+                    typeof(ToolPermissionPersistenceSource)]),
+            "12L read-only permission source foundation does not make production runtime ready");
         check(productionTypes.Where(type => typeof(IActionExecutionStateStore).IsAssignableFrom(type))
                 .SequenceEqual([typeof(UnavailableActionExecutionStateStore)]),
             "12L no production execution-state store exists");
