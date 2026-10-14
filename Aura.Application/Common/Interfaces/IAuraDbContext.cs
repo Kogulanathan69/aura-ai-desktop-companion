@@ -38,10 +38,19 @@ public interface IAuraDbContext
     DbSet<Permission> Permissions { get; }
 
     DbSet<ToolPermissionGrantRecord> ToolPermissionGrants { get; }
+
     DbSet<ActionExecutionStateRecord> ActionExecutionStates { get; }
+
     DbSet<SecurityAuditEventRecord> SecurityAuditEvents { get; }
-    DbSet<ExecutionReconciliationAssessmentRecord> ExecutionReconciliationAssessments { get; }
-    DbSet<ExecutionVerificationAssessmentRecord> ExecutionVerificationAssessments { get; }
+
+    DbSet<ExecutionReconciliationAssessmentRecord>
+        ExecutionReconciliationAssessments { get; }
+
+    DbSet<ExecutionVerificationAssessmentRecord>
+        ExecutionVerificationAssessments { get; }
+
+    DbSet<SecurityAuditOutboxRecord>
+        SecurityAuditOutbox { get; }
 
     DbSet<AuditLog> AuditLogs { get; }
 
