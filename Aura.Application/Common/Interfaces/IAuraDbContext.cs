@@ -37,6 +37,8 @@ public interface IAuraDbContext
 
     DbSet<Permission> Permissions { get; }
 
+    DbSet<ToolPermissionGrantRecord> ToolPermissionGrants { get; }
+
     DbSet<AuditLog> AuditLogs { get; }
 
     DbSet<Device> Devices { get; }
