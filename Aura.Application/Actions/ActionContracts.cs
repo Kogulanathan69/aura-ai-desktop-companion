@@ -15,6 +15,7 @@ public sealed record ActionIdentifier
     public Guid Value { get; }
     private ActionIdentifier(Guid value) => Value = value;
     internal static ActionIdentifier Create() => new(Guid.NewGuid());
+    internal static ActionIdentifier RestoreTrusted(Guid value) => new(value);
 }
 
 // Server-resolved application scope only; never bind it from a public request.
