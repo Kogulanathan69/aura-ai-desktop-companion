@@ -126,12 +126,17 @@ await SecurityPersistenceBundleChecks.RunAsync(Check);
 // --------------------------------------------------
 
 await MigrationBaselineReadinessChecks.RunAsync(Check);
-
 await CompositeBindingIntegrityChecks.RunAsync(Check);
-
 await AuditDeliveryReliabilityChecks.RunAsync(Check);
-
 await PersistenceHardeningReadinessChecks.RunAsync(Check);
+
+
+// --------------------------------------------------
+// Step 13G
+// Security Audit Outbox Foundation
+// --------------------------------------------------
+
+await SecurityAuditOutboxChecks.RunAsync(Check);
 
 
 // --------------------------------------------------

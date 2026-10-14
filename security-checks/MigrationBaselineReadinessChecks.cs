@@ -24,17 +24,19 @@ internal static class MigrationBaselineReadinessChecks
         {
             "20261014000000_AddToolPermissionGrants.cs",
             "20261014000001_AddActionExecutionStates.cs",
-            "20261014000002_AddSecurityPersistenceBundle.cs"
+            "20261014000002_AddSecurityPersistenceBundle.cs",
+            "20261014000003_AddSecurityAuditOutbox.cs"
         };
 
         check(
             migrationFiles.SequenceEqual(expected),
-            "13F current targeted migration sequence is exact and ordered");
+            "13G current targeted migration sequence is exact and ordered");
 
         check(
             string.CompareOrdinal(expected[0], expected[1]) < 0 &&
-            string.CompareOrdinal(expected[1], expected[2]) < 0,
-            "13F security persistence migration follows permission and execution-state migrations");
+            string.CompareOrdinal(expected[1], expected[2]) < 0 &&
+            string.CompareOrdinal(expected[2], expected[3]) < 0,
+            "13G audit outbox migration follows permission, execution-state and security persistence migrations");
 
         var bundle = new AddSecurityPersistenceBundle();
 
@@ -54,13 +56,32 @@ internal static class MigrationBaselineReadinessChecks
                 x => x is DropTableOperation),
             "13F rollback remains limited to newly introduced security tables");
 
+        var outbox = new AddSecurityAuditOutbox();
+
+        check(
+            outbox.UpOperations.Count(
+                x => x is CreateTableOperation) == 1,
+            "13G audit outbox migration creates exactly one new table");
+
+        check(
+            outbox.UpOperations.All(
+                x => x is CreateTableOperation or CreateIndexOperation),
+            "13G audit outbox migration performs no data mutation or existing-table alteration");
+
+        check(
+            outbox.DownOperations.Count == 1 &&
+            outbox.DownOperations.Single()
+                is DropTableOperation drop &&
+            drop.Name == "SecurityAuditOutbox",
+            "13G audit outbox rollback removes only the new outbox table");
+
         var snapshotFiles = Directory.GetFiles(
             migrationDirectory,
             "*ModelSnapshot.cs");
 
         check(
             snapshotFiles.Length == 0,
-            "13F no EF model snapshot is present; historical baseline remains explicitly unverified");
+            "13G no EF model snapshot is present; historical baseline remains explicitly unverified");
 
         return Task.CompletedTask;
     }
