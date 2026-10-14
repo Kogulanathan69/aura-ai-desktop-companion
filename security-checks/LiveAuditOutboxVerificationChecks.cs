@@ -60,12 +60,13 @@ internal static class LiveAuditOutboxVerificationChecks
             !harness.Contains("Password=") && !harness.Contains("Host=localhost") &&
             !harness.Contains("Host=127.0.0.1"),
             "13I connection and disposable gates contain no credential or localhost fallback");
-        check(harness.Contains("db.Database.MigrateAsync(token)") &&
+        check(!harness.Contains("db.Database.MigrateAsync(token)") &&
+            harness.Contains("20261014000004_HardenSecurityAuditOutboxDelivery") &&
             harness.Contains("x.Id == id.Outbox") &&
             harness.Contains("x.Id == id.Event") &&
             !harness.Contains("TRUNCATE", StringComparison.OrdinalIgnoreCase) &&
             !harness.Contains("EnsureCreated", StringComparison.Ordinal),
-            "13I migrations and cleanup are confined to gated disposable test path and fixture IDs");
+            "13I requires hardened schema and cleanup remains confined to fixture IDs");
         check(!api.Contains("LiveAuditOutboxVerification") &&
             !api.Contains("SecurityAuditOutboxDispatcher") &&
             !api.Contains("Database.Migrate") &&

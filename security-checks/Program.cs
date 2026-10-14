@@ -43,6 +43,13 @@ if (args.Length == 1 && args[0] == LiveAuditOutboxVerification.Command)
     return;
 }
 
+if (args.Length == 1 && args[0] == LiveAuditOutboxHardeningVerification.Command)
+{
+    Environment.ExitCode = await LiveAuditOutboxHardeningVerification.RunAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 var checks = 0;
 
 void Check(bool condition, string name)
@@ -147,6 +154,7 @@ await SecurityAuditOutboxChecks.RunAsync(Check);
 await SecurityAuditOutboxDispatcherChecks.RunAsync(Check);
 await LiveAuditOutboxVerificationChecks.RunAsync(Check);
 await AuditOutboxSchemaHardeningChecks.RunAsync(Check);
+await LiveAuditOutboxHardeningVerificationChecks.RunAsync(Check);
 
 
 // --------------------------------------------------
