@@ -126,7 +126,8 @@ internal static class ExactToolPermissionSchemaChecks
                 .Concat(typeof(IToolPermissionSource).Assembly.GetTypes())
                 .Where(type => type.IsClass && !type.IsAbstract &&
                     typeof(IToolPermissionSource).IsAssignableFrom(type))
-                .SequenceEqual([typeof(UnavailableToolPermissionSource)]),
-            "13A production permission adapter is still unavailable");
+                .ToHashSet().SetEquals([typeof(UnavailableToolPermissionSource),
+                    typeof(ToolPermissionPersistenceSource)]),
+            "13A exact source is unregistered; generic permission remains separate");
     }
 }

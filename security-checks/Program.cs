@@ -16,6 +16,13 @@ if (args.Length == 1 && args[0] == LiveOwnershipVerification.Command)
     return;
 }
 
+if (args.Length == 1 && args[0] == LivePermissionVerification.Command)
+{
+    Environment.ExitCode = await LivePermissionVerification.RunAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 var checks = 0;
 void Check(bool condition, string name)
 {
@@ -52,6 +59,8 @@ await ReconciliationVerificationPersistenceReadinessChecks.RunAsync(Check);
 await RuntimeReadinessConsolidationChecks.RunAsync(Check);
 await FinalProductionReadinessChecks.RunAsync(Check);
 await ExactToolPermissionSchemaChecks.RunAsync(Check);
+await ToolPermissionPersistenceChecks.RunAsync(Check);
+await LivePermissionVerificationChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();
