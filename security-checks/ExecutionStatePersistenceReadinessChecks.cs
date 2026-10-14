@@ -3,6 +3,7 @@ using Aura.Application.Executions;
 using Aura.Application.Security;
 using Aura.Domain.Entities;
 using Aura.Infrastructure.Data;
+using Aura.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 internal static class ExecutionStatePersistenceReadinessChecks
@@ -73,8 +74,9 @@ internal static class ExecutionStatePersistenceReadinessChecks
             .Concat(typeof(RuntimeSafetyOptions).Assembly.GetTypes())
             .Where(type => type.IsClass && !type.IsAbstract &&
                 typeof(IActionExecutionStateStore).IsAssignableFrom(type)).ToArray();
-        check(stores.SequenceEqual([typeof(UnavailableActionExecutionStateStore)]),
-            "12H incompatible schema has no production durable-state adapter");
+        check(stores.ToHashSet().SetEquals([typeof(UnavailableActionExecutionStateStore),
+                typeof(ActionExecutionStatePersistenceStore)]),
+            "13C durable adapter exists but remains unregistered; legacy entities are still insufficient");
         var unavailable = new UnavailableActionExecutionStateStore();
         check((await unavailable.TryReserveInitialAsync(null!, null!, CancellationToken.None)).Status ==
                 ActionExecutionStateResultStatus.Unavailable &&

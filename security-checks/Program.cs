@@ -61,6 +61,7 @@ await FinalProductionReadinessChecks.RunAsync(Check);
 await ExactToolPermissionSchemaChecks.RunAsync(Check);
 await ToolPermissionPersistenceChecks.RunAsync(Check);
 await LivePermissionVerificationChecks.RunAsync(Check);
+await ExecutionStateAtomicStoreChecks.RunAsync(Check);
 
 var defaults = new ConfigurationBuilder().Build().GetSection(ProjectFileAccessOptions.SectionName)
     .Get<ProjectFileAccessOptions>() ?? new();
