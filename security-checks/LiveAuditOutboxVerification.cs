@@ -32,7 +32,8 @@ internal static class LiveAuditOutboxVerification
         }
         try
         {
-            var passed = await (execute ?? ExecuteLiveAsync)(connection!, cancellationToken);
+            var passed = await (execute ?? ((value, ct) => ExecuteLiveAsync(value, ct)))(
+                connection!, cancellationToken);
             write(passed ? "LIVE AUDIT OUTBOX VERIFY: PASS" : "LIVE AUDIT OUTBOX VERIFY: FAIL");
             return passed ? 0 : 1;
         }
@@ -57,14 +58,15 @@ internal static class LiveAuditOutboxVerification
         catch (Exception ex) when (ex is ArgumentException or FormatException) { return false; }
     }
 
-    private sealed record Fixture(Guid User, Guid AuthUser, Guid Project, Guid Conversation,
+    internal sealed record Fixture(Guid User, Guid AuthUser, Guid Project, Guid Conversation,
         Guid Action, Guid Approval, Guid Execution, Guid Outbox, Guid Event)
     {
         internal static Fixture New() => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
     }
 
-    private static async Task<bool> ExecuteLiveAsync(string connection, CancellationToken token)
+    internal static async Task<bool> ExecuteLiveAsync(string connection, CancellationToken token,
+        Action<bool>? cleanupStatus = null)
     {
         var options = new DbContextOptionsBuilder<AuraDbContext>()
             .UseNpgsql(connection, npgsql => npgsql.UseVector()).Options;
@@ -85,10 +87,9 @@ internal static class LiveAuditOutboxVerification
                 "20261014000001_AddActionExecutionStates",
                 "20261014000002_AddSecurityPersistenceBundle" }
                 .All(prerequisites.Contains)) return false;
-            // Only the gated, explicitly named disposable database can reach this call.
-            await db.Database.MigrateAsync(token);
             var migrations = await db.Database.GetAppliedMigrationsAsync(token);
             if (!migrations.Contains("20261014000003_AddSecurityAuditOutbox") ||
+                !migrations.Contains("20261014000004_HardenSecurityAuditOutboxDelivery") ||
                 !await TableExistsAsync(db, "SecurityAuditOutbox", token) ||
                 !await TableExistsAsync(db, "SecurityAuditEvents", token)) return false;
         }
@@ -101,11 +102,13 @@ internal static class LiveAuditOutboxVerification
             var success = await AddFixtureAsync(factory, fixtures, token);
             var dispatcher = new SecurityAuditOutboxDispatcher(factory, new SecurityAuditPersistenceSink(factory));
             if ((await dispatcher.DispatchAsync(success.Outbox, token)).Status != AuditOutboxDispatchStatus.Delivered ||
+                (await dispatcher.DispatchAsync(success.Outbox, token)).Status != AuditOutboxDispatchStatus.NotPending ||
                 !await StateAsync(factory, success, SecurityAuditOutboxDeliveryState.Delivered, 1, true, 1, token)) return false;
 
             var failed = await AddFixtureAsync(factory, fixtures, token);
             if ((await new SecurityAuditOutboxDispatcher(factory, new FixedSink(AuditSinkStatus.Failed))
                     .DispatchAsync(failed.Outbox, token)).Status != AuditOutboxDispatchStatus.Failed ||
+                (await dispatcher.DispatchAsync(failed.Outbox, token)).Status != AuditOutboxDispatchStatus.NotPending ||
                 !await StateAsync(factory, failed, SecurityAuditOutboxDeliveryState.Failed, 1, false, 0, token)) return false;
 
             var unavailable = await AddFixtureAsync(factory, fixtures, token);
@@ -178,7 +181,11 @@ internal static class LiveAuditOutboxVerification
         finally
         {
             // A failure to remove any fixture is a failed verification, never a pass.
-            if (!await CleanupAsync(factory, fixtures, CancellationToken.None)) passed = false;
+            var cleanupOk = false;
+            try { cleanupOk = await CleanupAsync(factory, fixtures, CancellationToken.None); }
+            catch (Exception) { cleanupOk = false; }
+            cleanupStatus?.Invoke(cleanupOk);
+            if (!cleanupOk) passed = false;
         }
         return passed;
     }
@@ -194,7 +201,7 @@ internal static class LiveAuditOutboxVerification
         return (bool)(await command.ExecuteScalarAsync(token) ?? false);
     }
 
-    private static async Task<Fixture> AddFixtureAsync(IDbContextFactory<AuraDbContext> factory,
+    internal static async Task<Fixture> AddFixtureAsync(IDbContextFactory<AuraDbContext> factory,
         List<Fixture> fixtures, CancellationToken token,
         AuditEventOutcome outcome = AuditEventOutcome.Success, string tool = "audit-outbox-check")
     {
@@ -288,7 +295,7 @@ internal static class LiveAuditOutboxVerification
                 audit.PermissionGrantId is null);
     }
 
-    private static async Task<bool> CleanupAsync(IDbContextFactory<AuraDbContext> factory,
+    internal static async Task<bool> CleanupAsync(IDbContextFactory<AuraDbContext> factory,
         List<Fixture> fixtures, CancellationToken token)
     {
         await using var db = await factory.CreateDbContextAsync(token);
