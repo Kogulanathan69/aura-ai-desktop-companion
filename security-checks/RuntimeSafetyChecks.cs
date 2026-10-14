@@ -64,7 +64,7 @@ internal static class RuntimeSafetyChecks
             "11Z partial cloud flag, router, or provider enablement fails closed");
         check(Assess(new RuntimeSafetyOptions { CloudAiEnabled = true },
             routerOptions: new AiProviderRouterOptions { Mode = AiProviderMode.Cloud },
-            cloudOptions: new OpenAiOptions { Enabled = true }) == RuntimeSafetyStatus.Valid,
+            cloudOptions: new OpenAiOptions { Enabled = true, ApiKey = "synthetic-check-only", Model = "check-model" }) == RuntimeSafetyStatus.Valid,
             "11Z deliberate consistent cloud configuration passes pure safety gate");
         check(Assess(options, routerOptions: new AiProviderRouterOptions { Mode = (AiProviderMode)99 }) ==
             RuntimeSafetyStatus.InvalidConfiguration && Assess(null) == RuntimeSafetyStatus.InvalidConfiguration &&

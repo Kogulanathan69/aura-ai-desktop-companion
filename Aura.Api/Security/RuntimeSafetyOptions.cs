@@ -29,6 +29,11 @@ public sealed class RuntimeSafetyValidator
             !Enum.IsDefined(router.Mode))
             return RuntimeSafetyStatus.InvalidConfiguration;
 
+        // Derived capabilities cannot be asserted without their durable source.
+        if (readiness.Reconciliation && !readiness.ExecutionState ||
+            readiness.Verification && !readiness.ExecutionState)
+            return RuntimeSafetyStatus.InvalidConfiguration;
+
         // Existing options cannot silently enable a capability omitted from this section.
         if (fileAccess.Enabled != options.SafeFileAccessEnabled ||
             cloud.Enabled != options.CloudAiEnabled ||
@@ -46,11 +51,33 @@ public sealed class RuntimeSafetyValidator
             !(readiness.Handler && readiness.ExecutionPolicy && readiness.Ownership &&
               readiness.Permission && readiness.ExecutionState && readiness.AuditSink) ||
             options.AuditPersistenceEnabled && !readiness.AuditSink ||
-            options.SafeFileAccessEnabled && !readiness.SafeFileAccess)
+            options.SafeFileAccessEnabled && (!readiness.SafeFileAccess ||
+                !HasConfiguredFileRoots(fileAccess)))
             return RuntimeSafetyStatus.MissingRequiredAdapter;
+
+        if (options.CloudAiEnabled && !OpenAiConfiguration.TryValidate(cloud))
+            return RuntimeSafetyStatus.InvalidConfiguration;
 
         return options.ProductionAdaptersEnabled || options.ToolExecutionEnabled ||
             options.SafeFileAccessEnabled || options.CloudAiEnabled || options.AuditPersistenceEnabled
             ? RuntimeSafetyStatus.Valid : RuntimeSafetyStatus.SafeDisabled;
+    }
+
+    private static bool HasConfiguredFileRoots(ProjectFileAccessOptions options)
+    {
+        try
+        {
+            return options.AllowedRootsByUser is { Count: > 0 } roots && roots.All(entry =>
+                Guid.TryParseExact(entry.Key, "D", out var userId) && userId != Guid.Empty &&
+                entry.Value is { Length: > 0 } && entry.Value.All(root =>
+                    !string.IsNullOrWhiteSpace(root) && Path.IsPathFullyQualified(root) &&
+                    (!OperatingSystem.IsWindows() || !root.StartsWith(@"\\", StringComparison.Ordinal)) &&
+                    !string.Equals(Path.GetFullPath(root), Path.GetPathRoot(root),
+                        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
     }
 }
