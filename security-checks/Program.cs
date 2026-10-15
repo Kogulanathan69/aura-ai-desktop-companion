@@ -119,6 +119,7 @@ await ProductionExecutionStateCompositionChecks.RunAsync(Check);
 await ProductionAuditSinkCompositionChecks.RunAsync(Check);
 await ProductionAuditDeliveryCompositionChecks.RunAsync(Check);
 await ProductionReconciliationCompositionChecks.RunAsync(Check);
+await ProductionVerificationCompositionChecks.RunAsync(Check);
 await FinalProductionReadinessChecks.RunAsync(Check);
 await FinalProductionActivationGateChecks.RunAsync(Check);
 
