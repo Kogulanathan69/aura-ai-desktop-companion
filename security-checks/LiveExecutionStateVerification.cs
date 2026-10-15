@@ -392,27 +392,176 @@ internal static class LiveExecutionStateVerification
                 rows[0].CompletedAt is not null);
     }
 
-    private static async Task<bool> CleanupAsync(IDbContextFactory<AuraDbContext> factory,
-        FixtureIds ids, CancellationToken cancellationToken)
+    private static async Task<bool> CleanupAsync(
+        IDbContextFactory<AuraDbContext> factory,
+        FixtureIds ids,
+        CancellationToken cancellationToken)
     {
-        await using var db = await factory.CreateDbContextAsync(cancellationToken);
-        await db.ActionExecutionStates.Where(x => ids.Actions.Contains(x.ActionId) && x.UserId == ids.User)
+        await using var db =
+            await factory.CreateDbContextAsync(cancellationToken);
+
+        await db.SecurityAuditOutbox
+            .Where(x =>
+                ids.Actions.Contains(x.ActionId) &&
+                x.UserId == ids.User)
             .ExecuteDeleteAsync(cancellationToken);
-        await db.ActionApprovals.Where(x => ids.Approvals.Contains(x.Id) && x.UserId == ids.User)
+
+        await db.SecurityAuditEvents
+            .Where(x =>
+                x.ActionId.HasValue &&
+                ids.Actions.Contains(x.ActionId.Value) &&
+                x.UserId == ids.User)
             .ExecuteDeleteAsync(cancellationToken);
-        await db.AIActions.Where(x => ids.Actions.Contains(x.Id) && x.UserId == ids.User)
+
+        await db.ExecutionVerificationAssessments
+            .Where(x =>
+                ids.Actions.Contains(x.ActionId) &&
+                x.UserId == ids.User)
             .ExecuteDeleteAsync(cancellationToken);
-        await db.Conversations.Where(x => x.Id == ids.Conversation && x.UserId == ids.User)
+
+        await db.ExecutionReconciliationAssessments
+            .Where(x =>
+                ids.Actions.Contains(x.ActionId) &&
+                x.UserId == ids.User)
             .ExecuteDeleteAsync(cancellationToken);
-        await db.Projects.Where(x => x.Id == ids.Project && x.UserId == ids.User)
+
+        await db.ActionExecutionStates
+            .Where(x =>
+                ids.Actions.Contains(x.ActionId) &&
+                x.UserId == ids.User)
             .ExecuteDeleteAsync(cancellationToken);
-        await db.Users.Where(x => x.Id == ids.User && x.AuthUserId == ids.AuthUser)
+
+        await db.ActionApprovals
+            .Where(x =>
+                ids.Approvals.Contains(x.Id) &&
+                x.UserId == ids.User)
             .ExecuteDeleteAsync(cancellationToken);
-        return !await db.ActionExecutionStates.AsNoTracking().AnyAsync(x => ids.Actions.Contains(x.ActionId), cancellationToken) &&
-            !await db.ActionApprovals.AsNoTracking().AnyAsync(x => ids.Approvals.Contains(x.Id), cancellationToken) &&
-            !await db.AIActions.AsNoTracking().AnyAsync(x => ids.Actions.Contains(x.Id), cancellationToken) &&
-            !await db.Conversations.AsNoTracking().AnyAsync(x => x.Id == ids.Conversation, cancellationToken) &&
-            !await db.Projects.AsNoTracking().AnyAsync(x => x.Id == ids.Project, cancellationToken) &&
-            !await db.Users.AsNoTracking().AnyAsync(x => x.Id == ids.User, cancellationToken);
+
+        await db.AIActions
+            .Where(x =>
+                ids.Actions.Contains(x.Id) &&
+                x.UserId == ids.User)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await db.Conversations
+            .Where(x =>
+                x.Id == ids.Conversation &&
+                x.UserId == ids.User)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await db.Projects
+            .Where(x =>
+                x.Id == ids.Project &&
+                x.UserId == ids.User)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await db.Users
+            .Where(x =>
+                x.Id == ids.User &&
+                x.AuthUserId == ids.AuthUser)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        var outboxGone =
+            !await db.SecurityAuditOutbox
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        ids.Actions.Contains(x.ActionId) &&
+                        x.UserId == ids.User,
+                    cancellationToken);
+
+        var auditEventsGone =
+            !await db.SecurityAuditEvents
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        x.ActionId.HasValue &&
+                        ids.Actions.Contains(x.ActionId.Value) &&
+                        x.UserId == ids.User,
+                    cancellationToken);
+
+        var verificationGone =
+            !await db.ExecutionVerificationAssessments
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        ids.Actions.Contains(x.ActionId) &&
+                        x.UserId == ids.User,
+                    cancellationToken);
+
+        var reconciliationGone =
+            !await db.ExecutionReconciliationAssessments
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        ids.Actions.Contains(x.ActionId) &&
+                        x.UserId == ids.User,
+                    cancellationToken);
+
+        var executionStatesGone =
+            !await db.ActionExecutionStates
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        ids.Actions.Contains(x.ActionId) &&
+                        x.UserId == ids.User,
+                    cancellationToken);
+
+        var approvalsGone =
+            !await db.ActionApprovals
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        ids.Approvals.Contains(x.Id) &&
+                        x.UserId == ids.User,
+                    cancellationToken);
+
+        var actionsGone =
+            !await db.AIActions
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        ids.Actions.Contains(x.Id) &&
+                        x.UserId == ids.User,
+                    cancellationToken);
+
+        var conversationGone =
+            !await db.Conversations
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        x.Id == ids.Conversation &&
+                        x.UserId == ids.User,
+                    cancellationToken);
+
+        var projectGone =
+            !await db.Projects
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        x.Id == ids.Project &&
+                        x.UserId == ids.User,
+                    cancellationToken);
+
+        var userGone =
+            !await db.Users
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        x.Id == ids.User &&
+                        x.AuthUserId == ids.AuthUser,
+                    cancellationToken);
+
+        return
+            outboxGone &&
+            auditEventsGone &&
+            verificationGone &&
+            reconciliationGone &&
+            executionStatesGone &&
+            approvalsGone &&
+            actionsGone &&
+            conversationGone &&
+            projectGone &&
+            userGone;
     }
 }

@@ -72,8 +72,17 @@ internal static class LiveExecutionStateVerificationChecks
             !harness.Contains("EnsureCreated", StringComparison.Ordinal) &&
             !harness.Contains("TRUNCATE", StringComparison.OrdinalIgnoreCase) &&
             !harness.Contains("ExecuteDeleteAsync(CancellationToken.None)", StringComparison.Ordinal) &&
-            harness.Contains("ids.Actions.Contains(x.ActionId) && x.UserId == ids.User", StringComparison.Ordinal),
-            "13D no migration apply or broad cleanup; deletes require generated fixture IDs");
+            harness.Contains("db.SecurityAuditOutbox", StringComparison.Ordinal) &&
+            harness.Contains("db.SecurityAuditEvents", StringComparison.Ordinal) &&
+            harness.Contains("db.ExecutionVerificationAssessments", StringComparison.Ordinal) &&
+            harness.Contains("db.ExecutionReconciliationAssessments", StringComparison.Ordinal) &&
+            harness.Contains("ids.Actions.Contains(", StringComparison.Ordinal) &&
+            harness.Contains("x.UserId == ids.User", StringComparison.Ordinal) &&
+            harness.Contains("ids.Conversation &&", StringComparison.Ordinal) &&
+            harness.Contains("ids.Project &&", StringComparison.Ordinal) &&
+            harness.Contains("ids.User &&", StringComparison.Ordinal) &&
+            harness.Contains("ids.AuthUser", StringComparison.Ordinal),
+            "13D cleanup includes later security dependents and remains scoped to generated fixture IDs");
         var startup = new UnavailableRuntimeCapabilityReadiness().GetSnapshot();
         var informational = new PersistenceCapabilityReadiness().GetSnapshot();
         var safety = new RuntimeSafetyOptions();
