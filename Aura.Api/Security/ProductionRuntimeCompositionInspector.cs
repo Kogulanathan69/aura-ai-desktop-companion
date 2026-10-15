@@ -55,7 +55,7 @@ public static class ProductionRuntimeCompositionInspector
             HasExactAuditDeliveryDispatcher(services),
             HasExactReconciliationSource(services),
             HasExactVerificationSource(services),
-            HasOne<IToolExecutionPolicy>(services, ReviewedExecutionPolicy),
+            HasExactExecutionPolicy(services),
             HasOne<IToolHandler>(services, ReviewedToolHandlers),
             HasOne<ITrustedToolExecutionService>(services, ReviewedTrustedExecution));
     }
@@ -140,6 +140,19 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].ImplementationType is { } implementation &&
             implementation != typeof(UnavailableExecutionEvidenceSource) &&
             ReviewedVerification.Contains(implementation);
+    }
+
+    // No allowing production policy exists yet. The deny-only implementation
+    // cannot count even if it is registered; review must name a future exact type.
+    private static bool HasExactExecutionPolicy(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(IToolExecutionPolicy))
+            .ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType is { } implementation &&
+            implementation != typeof(DenyToolExecutionPolicy) &&
+            ReviewedExecutionPolicy.Contains(implementation);
     }
 
     // The actual context registration uses a scoped factory. This is a necessary
