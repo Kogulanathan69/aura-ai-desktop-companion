@@ -53,7 +53,7 @@ public static class ProductionRuntimeCompositionInspector
             HasExactExecutionStateStore(services),
             HasExactAuditSink(services),
             HasExactAuditDeliveryDispatcher(services),
-            HasOne<IExecutionReconciliationSource>(services, ReviewedReconciliation),
+            HasExactReconciliationSource(services),
             HasOne<IExecutionEvidenceSource>(services, ReviewedVerification),
             HasOne<IToolExecutionPolicy>(services, ReviewedExecutionPolicy),
             HasOne<IToolHandler>(services, ReviewedToolHandlers),
@@ -115,6 +115,18 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType == typeof(SecurityAuditOutboxDispatcher) &&
             ReviewedAuditDelivery.Contains(typeof(SecurityAuditOutboxDispatcher));
+    }
+
+    // Durable state and an advisory source do not assert reviewed reconciliation.
+    // The reviewed catalog remains empty until separate production evidence exists.
+    private static bool HasExactReconciliationSource(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(IExecutionReconciliationSource))
+            .ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType == typeof(ExecutionReconciliationPersistenceSource) &&
+            ReviewedReconciliation.Contains(typeof(ExecutionReconciliationPersistenceSource));
     }
 
     // The actual context registration uses a scoped factory. This is a necessary
