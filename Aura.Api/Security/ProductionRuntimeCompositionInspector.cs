@@ -54,7 +54,7 @@ public static class ProductionRuntimeCompositionInspector
             HasExactAuditSink(services),
             HasExactAuditDeliveryDispatcher(services),
             HasExactReconciliationSource(services),
-            HasOne<IExecutionEvidenceSource>(services, ReviewedVerification),
+            HasExactVerificationSource(services),
             HasOne<IToolExecutionPolicy>(services, ReviewedExecutionPolicy),
             HasOne<IToolHandler>(services, ReviewedToolHandlers),
             HasOne<ITrustedToolExecutionService>(services, ReviewedTrustedExecution));
@@ -127,6 +127,19 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType == typeof(ExecutionReconciliationPersistenceSource) &&
             ReviewedReconciliation.Contains(typeof(ExecutionReconciliationPersistenceSource));
+    }
+
+    // No independent production evidence adapter exists yet. A future exact type
+    // must be separately reviewed; the unavailable source can never qualify.
+    private static bool HasExactVerificationSource(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(IExecutionEvidenceSource))
+            .ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType is { } implementation &&
+            implementation != typeof(UnavailableExecutionEvidenceSource) &&
+            ReviewedVerification.Contains(implementation);
     }
 
     // The actual context registration uses a scoped factory. This is a necessary
