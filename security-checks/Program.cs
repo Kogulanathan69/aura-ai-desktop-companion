@@ -114,6 +114,7 @@ await ReconciliationVerificationPersistenceReadinessChecks.RunAsync(Check);
 await RuntimeReadinessConsolidationChecks.RunAsync(Check);
 await ProductionRuntimeCompositionChecks.RunAsync(Check);
 await ProductionOwnershipCompositionChecks.RunAsync(Check);
+await ProductionPermissionCompositionChecks.RunAsync(Check);
 await FinalProductionReadinessChecks.RunAsync(Check);
 await FinalProductionActivationGateChecks.RunAsync(Check);
 

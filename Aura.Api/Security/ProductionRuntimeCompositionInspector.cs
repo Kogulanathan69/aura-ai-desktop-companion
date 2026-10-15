@@ -4,6 +4,7 @@ using Aura.Application.Executions;
 using Aura.Application.Tools;
 using Aura.Application.Verifications;
 using Aura.Application.Common.Interfaces;
+using Aura.Infrastructure.Data;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Aura.Api.Security;
@@ -47,7 +48,7 @@ public static class ProductionRuntimeCompositionInspector
             HasOne<ICurrentUserContext>(services, ReviewedOwnershipContext) &&
             HasOne<IOwnershipSource>(services, ReviewedOwnershipSource) &&
             HasOne<IToolExecutionScopeValidator>(services, ReviewedOwnershipValidator),
-            HasOne<IToolPermissionSource>(services, ReviewedPermission),
+            HasExactPermissionSource(services),
             HasOne<IActionExecutionStateStore>(services, ReviewedExecutionState),
             HasOne<IAuditEventSink>(services, ReviewedAuditSink),
             HasOne<IAuditOutboxDispatcher>(services, ReviewedAuditDelivery),
@@ -65,6 +66,18 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType is { } implementation &&
             reviewed.Contains(implementation);
+    }
+
+    // A generic Permission adapter, unavailable source, factory or registration
+    // alone cannot attest an exact tool grant. The reviewed catalog is empty today.
+    private static bool HasExactPermissionSource(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(IToolPermissionSource))
+            .ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType == typeof(ToolPermissionPersistenceSource) &&
+            ReviewedPermission.Contains(typeof(ToolPermissionPersistenceSource));
     }
 
     // The actual context registration uses a scoped factory. This is a necessary
