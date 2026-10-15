@@ -52,7 +52,7 @@ public static class ProductionRuntimeCompositionInspector
             HasExactPermissionSource(services),
             HasExactExecutionStateStore(services),
             HasExactAuditSink(services),
-            HasOne<IAuditOutboxDispatcher>(services, ReviewedAuditDelivery),
+            HasExactAuditDeliveryDispatcher(services),
             HasOne<IExecutionReconciliationSource>(services, ReviewedReconciliation),
             HasOne<IExecutionEvidenceSource>(services, ReviewedVerification),
             HasOne<IToolExecutionPolicy>(services, ReviewedExecutionPolicy),
@@ -103,6 +103,18 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType == typeof(SecurityAuditPersistenceSink) &&
             ReviewedAuditSink.Contains(typeof(SecurityAuditPersistenceSink));
+    }
+
+    // An explicit one-item dispatcher still needs a reviewed production lifetime
+    // and registration. Tables, the sink, and manual methods do not assert delivery.
+    private static bool HasExactAuditDeliveryDispatcher(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(IAuditOutboxDispatcher))
+            .ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType == typeof(SecurityAuditOutboxDispatcher) &&
+            ReviewedAuditDelivery.Contains(typeof(SecurityAuditOutboxDispatcher));
     }
 
     // The actual context registration uses a scoped factory. This is a necessary
