@@ -5,6 +5,7 @@ using Aura.Application.Tools;
 using Aura.Application.Verifications;
 using Aura.Application.Common.Interfaces;
 using Aura.Infrastructure.Data;
+using Aura.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Aura.Api.Security;
@@ -49,7 +50,7 @@ public static class ProductionRuntimeCompositionInspector
             HasOne<IOwnershipSource>(services, ReviewedOwnershipSource) &&
             HasOne<IToolExecutionScopeValidator>(services, ReviewedOwnershipValidator),
             HasExactPermissionSource(services),
-            HasOne<IActionExecutionStateStore>(services, ReviewedExecutionState),
+            HasExactExecutionStateStore(services),
             HasOne<IAuditEventSink>(services, ReviewedAuditSink),
             HasOne<IAuditOutboxDispatcher>(services, ReviewedAuditDelivery),
             HasOne<IExecutionReconciliationSource>(services, ReviewedReconciliation),
@@ -78,6 +79,18 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType == typeof(ToolPermissionPersistenceSource) &&
             ReviewedPermission.Contains(typeof(ToolPermissionPersistenceSource));
+    }
+
+    // Durable state requires the exact reviewed store and its normal scoped DI
+    // registration. The reviewed catalog is empty until separate production review.
+    private static bool HasExactExecutionStateStore(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(IActionExecutionStateStore))
+            .ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType == typeof(ActionExecutionStatePersistenceStore) &&
+            ReviewedExecutionState.Contains(typeof(ActionExecutionStatePersistenceStore));
     }
 
     // The actual context registration uses a scoped factory. This is a necessary
