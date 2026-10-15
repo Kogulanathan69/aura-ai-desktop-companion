@@ -3,6 +3,7 @@ using Aura.Application.Auditing;
 using Aura.Application.Executions;
 using Aura.Application.Tools;
 using Aura.Application.Verifications;
+using Aura.Application.Common.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Aura.Api.Security;
@@ -24,6 +25,7 @@ public static class ProductionRuntimeCompositionInspector
     // Add concrete types only after their production registration, lifetime and
     // security evidence have been reviewed. Interface presence is never sufficient.
     private static readonly IReadOnlySet<Type> ReviewedOwnershipContext = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedSubjectMapping = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedOwnershipSource = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedOwnershipValidator = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedPermission = new HashSet<Type>();
@@ -40,6 +42,8 @@ public static class ProductionRuntimeCompositionInspector
     {
         ArgumentNullException.ThrowIfNull(services);
         return new(
+            HasOneScoped<IAuraDbContext>(services) &&
+            HasOne<IAuthenticatedUserMappingSource>(services, ReviewedSubjectMapping) &&
             HasOne<ICurrentUserContext>(services, ReviewedOwnershipContext) &&
             HasOne<IOwnershipSource>(services, ReviewedOwnershipSource) &&
             HasOne<IToolExecutionScopeValidator>(services, ReviewedOwnershipValidator),
@@ -61,5 +65,13 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType is { } implementation &&
             reviewed.Contains(implementation);
+    }
+
+    // The actual context registration uses a scoped factory. This is a necessary
+    // registration-shape check, never sufficient production review by itself.
+    private static bool HasOneScoped<T>(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(T)).ToArray();
+        return registrations.Length == 1 && registrations[0].Lifetime == ServiceLifetime.Scoped;
     }
 }
