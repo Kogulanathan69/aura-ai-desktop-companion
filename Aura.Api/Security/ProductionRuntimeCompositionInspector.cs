@@ -51,7 +51,7 @@ public static class ProductionRuntimeCompositionInspector
             HasOne<IToolExecutionScopeValidator>(services, ReviewedOwnershipValidator),
             HasExactPermissionSource(services),
             HasExactExecutionStateStore(services),
-            HasOne<IAuditEventSink>(services, ReviewedAuditSink),
+            HasExactAuditSink(services),
             HasOne<IAuditOutboxDispatcher>(services, ReviewedAuditDelivery),
             HasOne<IExecutionReconciliationSource>(services, ReviewedReconciliation),
             HasOne<IExecutionEvidenceSource>(services, ReviewedVerification),
@@ -91,6 +91,18 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType == typeof(ActionExecutionStatePersistenceStore) &&
             ReviewedExecutionState.Contains(typeof(ActionExecutionStatePersistenceStore));
+    }
+
+    // A direct security-audit sink must be separately reviewed and registered.
+    // Outbox delivery, generic logs and interface presence cannot substitute.
+    private static bool HasExactAuditSink(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(IAuditEventSink))
+            .ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType == typeof(SecurityAuditPersistenceSink) &&
+            ReviewedAuditSink.Contains(typeof(SecurityAuditPersistenceSink));
     }
 
     // The actual context registration uses a scoped factory. This is a necessary
