@@ -113,6 +113,7 @@ await ReconciliationVerificationPersistenceReadinessChecks.RunAsync(Check);
 
 await RuntimeReadinessConsolidationChecks.RunAsync(Check);
 await FinalProductionReadinessChecks.RunAsync(Check);
+await FinalProductionActivationGateChecks.RunAsync(Check);
 
 
 // --------------------------------------------------
