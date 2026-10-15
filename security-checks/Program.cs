@@ -123,6 +123,7 @@ await ProductionVerificationCompositionChecks.RunAsync(Check);
 await ProductionExecutionPolicyCompositionChecks.RunAsync(Check);
 await ProductionToolHandlersCompositionChecks.RunAsync(Check);
 await ProductionTrustedExecutionCompositionChecks.RunAsync(Check);
+await FinalProductionCompositionGateChecks.RunAsync(Check);
 await FinalProductionReadinessChecks.RunAsync(Check);
 await FinalProductionActivationGateChecks.RunAsync(Check);
 
