@@ -37,7 +37,9 @@ public static class ProductionRuntimeCompositionInspector
     private static readonly IReadOnlySet<Type> ReviewedReconciliation = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedVerification = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedExecutionPolicy = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedToolHandlers = new HashSet<Type>();
+    private static readonly IReadOnlyList<(Type HandlerType, string ToolId, ToolCapability Capability,
+        ToolPermissionRequirement Permission)> ReviewedToolHandlers =
+        Array.Empty<(Type, string, ToolCapability, ToolPermissionRequirement)>();
     private static readonly IReadOnlySet<Type> ReviewedTrustedExecution = new HashSet<Type>();
 
     public static ProductionRuntimeCompositionSnapshot Inspect(IServiceCollection services)
@@ -56,7 +58,7 @@ public static class ProductionRuntimeCompositionInspector
             HasExactReconciliationSource(services),
             HasExactVerificationSource(services),
             HasExactExecutionPolicy(services),
-            HasOne<IToolHandler>(services, ReviewedToolHandlers),
+            MatchesReviewedToolHandlers(services, ReviewedToolHandlers),
             HasOne<ITrustedToolExecutionService>(services, ReviewedTrustedExecution));
     }
 
@@ -153,6 +155,33 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].ImplementationType is { } implementation &&
             implementation != typeof(DenyToolExecutionPolicy) &&
             ReviewedExecutionPolicy.Contains(implementation);
+    }
+
+    // An empty catalog is never readiness. Each future entry must name one exact
+    // handler, canonical tool ID, capability and corresponding permission.
+    private static bool MatchesReviewedToolHandlers(IServiceCollection services,
+        IReadOnlyList<(Type HandlerType, string ToolId, ToolCapability Capability,
+            ToolPermissionRequirement Permission)> reviewed)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(IToolHandler))
+            .ToArray();
+        if (reviewed.Count is 0 or > ToolLimits.MaximumTools || registrations.Length != reviewed.Count ||
+            reviewed.Select(item => item.HandlerType).Distinct().Count() != reviewed.Count ||
+            reviewed.Select(item => item.ToolId).Distinct(StringComparer.Ordinal).Count() != reviewed.Count)
+            return false;
+
+        foreach (var item in reviewed)
+        {
+            if (!ToolIdentifier.TryCreate(item.ToolId, out var id) || id!.Value != item.ToolId ||
+                (item.Capability, item.Permission) is not
+                    ((ToolCapability.ProjectRead, ToolPermissionRequirement.OwnedProjectRead) or
+                     (ToolCapability.ProjectWrite, ToolPermissionRequirement.OwnedProjectWrite) or
+                     (ToolCapability.ExternalAction, ToolPermissionRequirement.ExternalAction)) ||
+                registrations.Count(descriptor => descriptor.ImplementationType == item.HandlerType &&
+                    descriptor.Lifetime == ServiceLifetime.Scoped) != 1)
+                return false;
+        }
+        return true;
     }
 
     // The actual context registration uses a scoped factory. This is a necessary
