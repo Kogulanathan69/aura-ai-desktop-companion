@@ -45,21 +45,24 @@ public static class ProductionRuntimeCompositionInspector
     public static ProductionRuntimeCompositionSnapshot Inspect(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        return new(
-            HasOneScoped<IAuraDbContext>(services) &&
+        var ownership = HasOneScoped<IAuraDbContext>(services) &&
             HasOne<IAuthenticatedUserMappingSource>(services, ReviewedSubjectMapping) &&
             HasOne<ICurrentUserContext>(services, ReviewedOwnershipContext) &&
             HasOne<IOwnershipSource>(services, ReviewedOwnershipSource) &&
-            HasOne<IToolExecutionScopeValidator>(services, ReviewedOwnershipValidator),
-            HasExactPermissionSource(services),
-            HasExactExecutionStateStore(services),
-            HasExactAuditSink(services),
-            HasExactAuditDeliveryDispatcher(services),
-            HasExactReconciliationSource(services),
-            HasExactVerificationSource(services),
-            HasExactExecutionPolicy(services),
-            MatchesReviewedToolHandlers(services, ReviewedToolHandlers),
-            HasOne<ITrustedToolExecutionService>(services, ReviewedTrustedExecution));
+            HasOne<IToolExecutionScopeValidator>(services, ReviewedOwnershipValidator);
+        var permission = HasExactPermissionSource(services);
+        var executionState = HasExactExecutionStateStore(services);
+        var auditSink = HasExactAuditSink(services);
+        var auditDelivery = HasExactAuditDeliveryDispatcher(services);
+        var reconciliation = HasExactReconciliationSource(services);
+        var verification = HasExactVerificationSource(services);
+        var executionPolicy = HasExactExecutionPolicy(services);
+        var toolHandlers = MatchesReviewedToolHandlers(services, ReviewedToolHandlers);
+        var trustedExecution = HasExactTrustedExecutionService(services) &&
+            TrustedPrerequisitesReady(ownership, permission, executionState, auditSink,
+                auditDelivery, reconciliation, verification, executionPolicy, toolHandlers);
+        return new(ownership, permission, executionState, auditSink, auditDelivery,
+            reconciliation, verification, executionPolicy, toolHandlers, trustedExecution);
     }
 
     private static bool HasOne<T>(IServiceCollection services, IReadOnlySet<Type> reviewed)
@@ -183,6 +186,24 @@ public static class ProductionRuntimeCompositionInspector
         }
         return true;
     }
+
+    // The exact service cannot assert readiness unless every separately reviewed
+    // prerequisite is present. The catalog remains empty pending production review.
+    private static bool HasExactTrustedExecutionService(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(ITrustedToolExecutionService))
+            .ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType == typeof(TrustedToolExecutionService) &&
+            ReviewedTrustedExecution.Contains(typeof(TrustedToolExecutionService));
+    }
+
+    private static bool TrustedPrerequisitesReady(bool ownership, bool permission,
+        bool executionState, bool auditSink, bool auditDelivery, bool reconciliation,
+        bool verification, bool executionPolicy, bool toolHandlers) =>
+        ownership && permission && executionState && auditSink && auditDelivery &&
+        reconciliation && verification && executionPolicy && toolHandlers;
 
     // The actual context registration uses a scoped factory. This is a necessary
     // registration-shape check, never sufficient production review by itself.
