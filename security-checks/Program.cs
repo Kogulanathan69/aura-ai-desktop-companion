@@ -112,6 +112,7 @@ await AuditPersistenceReadinessChecks.RunAsync(Check);
 await ReconciliationVerificationPersistenceReadinessChecks.RunAsync(Check);
 
 await RuntimeReadinessConsolidationChecks.RunAsync(Check);
+await ProductionRuntimeCompositionChecks.RunAsync(Check);
 await FinalProductionReadinessChecks.RunAsync(Check);
 await FinalProductionActivationGateChecks.RunAsync(Check);
 

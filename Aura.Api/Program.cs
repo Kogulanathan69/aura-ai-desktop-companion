@@ -144,6 +144,9 @@ builder.Services.AddDbContext<AuraDbContext>(options =>
 builder.Services.AddScoped<IAuraDbContext>(provider =>
     provider.GetRequiredService<AuraDbContext>());
 
+// Observational only: records reviewed production registrations without enabling them.
+builder.Services.AddSingleton(ProductionRuntimeCompositionInspector.Inspect(builder.Services));
+
 var app = builder.Build();
 app.UseExceptionHandler();
 

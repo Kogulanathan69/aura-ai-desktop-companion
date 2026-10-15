@@ -1,0 +1,65 @@
+using Aura.Application.Actions;
+using Aura.Application.Auditing;
+using Aura.Application.Executions;
+using Aura.Application.Tools;
+using Aura.Application.Verifications;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Aura.Api.Security;
+
+// Informational only. Every field requires one exact registered implementation from
+// the reviewed production catalog. The catalog is empty until separate review adds one.
+public sealed record ProductionRuntimeCompositionSnapshot(
+    bool Ownership, bool Permission, bool ExecutionState, bool AuditSink,
+    bool AuditDelivery, bool Reconciliation, bool Verification,
+    bool ExecutionPolicy, bool ToolHandlers, bool TrustedExecution)
+{
+    public bool CompositionComplete => Ownership && Permission && ExecutionState &&
+        AuditSink && AuditDelivery && Reconciliation && Verification &&
+        ExecutionPolicy && ToolHandlers && TrustedExecution;
+}
+
+public static class ProductionRuntimeCompositionInspector
+{
+    // Add concrete types only after their production registration, lifetime and
+    // security evidence have been reviewed. Interface presence is never sufficient.
+    private static readonly IReadOnlySet<Type> ReviewedOwnershipContext = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedOwnershipSource = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedOwnershipValidator = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedPermission = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedExecutionState = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedAuditSink = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedAuditDelivery = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedReconciliation = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedVerification = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedExecutionPolicy = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedToolHandlers = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedTrustedExecution = new HashSet<Type>();
+
+    public static ProductionRuntimeCompositionSnapshot Inspect(IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        return new(
+            HasOne<ICurrentUserContext>(services, ReviewedOwnershipContext) &&
+            HasOne<IOwnershipSource>(services, ReviewedOwnershipSource) &&
+            HasOne<IToolExecutionScopeValidator>(services, ReviewedOwnershipValidator),
+            HasOne<IToolPermissionSource>(services, ReviewedPermission),
+            HasOne<IActionExecutionStateStore>(services, ReviewedExecutionState),
+            HasOne<IAuditEventSink>(services, ReviewedAuditSink),
+            HasOne<IAuditOutboxDispatcher>(services, ReviewedAuditDelivery),
+            HasOne<IExecutionReconciliationSource>(services, ReviewedReconciliation),
+            HasOne<IExecutionEvidenceSource>(services, ReviewedVerification),
+            HasOne<IToolExecutionPolicy>(services, ReviewedExecutionPolicy),
+            HasOne<IToolHandler>(services, ReviewedToolHandlers),
+            HasOne<ITrustedToolExecutionService>(services, ReviewedTrustedExecution));
+    }
+
+    private static bool HasOne<T>(IServiceCollection services, IReadOnlySet<Type> reviewed)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(T)).ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType is { } implementation &&
+            reviewed.Contains(implementation);
+    }
+}
