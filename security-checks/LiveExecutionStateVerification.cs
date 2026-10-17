@@ -25,6 +25,9 @@ internal static class LiveExecutionStateVerification
     internal const string Command = "--live-execution-state";
     internal const string EnableVariable = "AURA_LIVE_EXECUTION_STATE_VERIFY";
     internal const string DisposableVariable = "AURA_EXECUTION_STATE_DB_IS_DISPOSABLE";
+    internal const string ProductionCommand = "--live-production-execution-state-evidence";
+    internal const string ProductionEnableVariable = "AURA_LIVE_PRODUCTION_EXECUTION_STATE_EVIDENCE";
+    internal const string ProductionDisposableVariable = "AURA_PRODUCTION_EVIDENCE_DB_IS_DISPOSABLE";
     private const string ConnectionVariable = "ConnectionStrings__DefaultConnection";
 
     private static readonly (LiveExecutionStateStage Stage, string Label)[] Stages =
@@ -43,17 +46,33 @@ internal static class LiveExecutionStateVerification
 
     internal static async Task<int> RunAsync(Func<string, string?> environment, Action<string> write,
         Func<LiveExecutionStateInput, CancellationToken, Task<LiveExecutionStateStage>>? execute = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await RunCoreAsync(environment, write, EnableVariable, DisposableVariable, false,
+            execute, cancellationToken);
+
+    internal static async Task<int> RunProductionAsync(Func<string, string?> environment,
+        Action<string> write,
+        Func<LiveExecutionStateInput, CancellationToken, Task<LiveExecutionStateStage>>? execute = null,
+        CancellationToken cancellationToken = default) =>
+        await RunCoreAsync(environment, write, ProductionEnableVariable,
+            ProductionDisposableVariable, true, execute, cancellationToken);
+
+    private static async Task<int> RunCoreAsync(Func<string, string?> environment,
+        Action<string> write, string enableVariable, string disposableVariable,
+        bool productionEvidence,
+        Func<LiveExecutionStateInput, CancellationToken, Task<LiveExecutionStateStage>>? execute,
+        CancellationToken cancellationToken)
     {
         try
         {
-            if (environment(EnableVariable) != "true" || environment(DisposableVariable) != "true")
+            if (environment(enableVariable) != "true" || environment(disposableVariable) != "true")
             {
-                write("LIVE EXECUTION STATE VERIFY: SKIPPED");
+                write(productionEvidence ? "PRODUCTION EXECUTION STATE EVIDENCE: SKIPPED" :
+                    "LIVE EXECUTION STATE VERIFY: SKIPPED");
                 return 0;
             }
             var connection = environment(ConnectionVariable);
-            if (!ValidConnection(connection))
+            if (!ValidConnection(connection, productionEvidence))
             {
                 write("DB CONNECTIVITY: FAIL");
                 write("RESULT: FAIL");
@@ -81,13 +100,18 @@ internal static class LiveExecutionStateVerification
         }
     }
 
-    private static bool ValidConnection(string? value)
+    private static bool ValidConnection(string? value, bool productionEvidence)
     {
         if (string.IsNullOrWhiteSpace(value)) return false;
         try
         {
             var parsed = new NpgsqlConnectionStringBuilder(value);
-            return !string.IsNullOrWhiteSpace(parsed.Host) && !string.IsNullOrWhiteSpace(parsed.Database);
+            return !string.IsNullOrWhiteSpace(parsed.Host) &&
+                !string.IsNullOrWhiteSpace(parsed.Database) &&
+                (!productionEvidence ||
+                    (!string.IsNullOrWhiteSpace(parsed.Username) &&
+                     parsed.Database.StartsWith("aura_disposable_", StringComparison.Ordinal) &&
+                     parsed.Database.Length > "aura_disposable_".Length));
         }
         catch (Exception ex) when (ex is ArgumentException or FormatException) { return false; }
     }
@@ -290,6 +314,23 @@ internal static class LiveExecutionStateVerification
             !await StateMatchesAsync(factory, ids.ActionA, DurableExecutionStatus.Reserved, 1,
                 winner.Value, true, cancellationToken)) return LiveExecutionStateStage.StaleVersion;
 
+        var wrongReservations = new (ReserveExecutionRequest Request,
+            ActionExecutionStateResultStatus Expected)[] {
+            (new(actionA, scope with { UserId = Guid.NewGuid() }, tool!, ids.ApprovalA, 0,
+                Attempt(Guid.NewGuid())), ActionExecutionStateResultStatus.ScopeMismatch),
+            (new(actionA, scope with { ConversationId = Guid.NewGuid() }, tool!, ids.ApprovalA, 0,
+                Attempt(Guid.NewGuid())), ActionExecutionStateResultStatus.ScopeMismatch),
+            (new(actionA, scope with { ProjectId = Guid.NewGuid() }, tool!, ids.ApprovalA, 0,
+                Attempt(Guid.NewGuid())), ActionExecutionStateResultStatus.ScopeMismatch),
+            (new(actionA, scope, otherTool!, ids.ApprovalA, 0,
+                Attempt(Guid.NewGuid())), ActionExecutionStateResultStatus.ToolMismatch),
+            (new(actionA, scope, tool!, ids.ApprovalC, 0,
+                Attempt(Guid.NewGuid())), ActionExecutionStateResultStatus.ApprovalMismatch)
+        };
+        foreach (var (wrong, expected) in wrongReservations)
+            if ((await store.TryReserveAsync(wrong, cancellationToken)).Status != expected)
+                return LiveExecutionStateStage.NegativeBindings;
+
         var wrongs = new[] {
             new CompleteExecutionRequest(actionB, scope, tool!, ids.ApprovalA, winner, 1, ExecutionOutcome.Succeeded),
             new CompleteExecutionRequest(actionA, scope with { UserId = Guid.NewGuid() }, tool!, ids.ApprovalA, winner, 1, ExecutionOutcome.Succeeded),
@@ -299,9 +340,18 @@ internal static class LiveExecutionStateVerification
             new CompleteExecutionRequest(actionA, scope, tool!, ids.ApprovalC, winner, 1, ExecutionOutcome.Succeeded),
             new CompleteExecutionRequest(actionA, scope, tool!, ids.ApprovalA, Attempt(Guid.NewGuid()), 1, ExecutionOutcome.Succeeded)
         };
-        foreach (var wrong in wrongs)
-            if ((await store.TryCompleteAsync(wrong, cancellationToken)).Status ==
-                ActionExecutionStateResultStatus.Success) return LiveExecutionStateStage.NegativeBindings;
+        var expectedCompletions = new[] {
+            ActionExecutionStateResultStatus.NotFound,
+            ActionExecutionStateResultStatus.ScopeMismatch,
+            ActionExecutionStateResultStatus.ScopeMismatch,
+            ActionExecutionStateResultStatus.ScopeMismatch,
+            ActionExecutionStateResultStatus.ToolMismatch,
+            ActionExecutionStateResultStatus.ApprovalMismatch,
+            ActionExecutionStateResultStatus.ExecutionMismatch
+        };
+        for (var index = 0; index < wrongs.Length; index++)
+            if ((await store.TryCompleteAsync(wrongs[index], cancellationToken)).Status !=
+                expectedCompletions[index]) return LiveExecutionStateStage.NegativeBindings;
         using (var cancelled = new CancellationTokenSource())
         {
             cancelled.Cancel();
