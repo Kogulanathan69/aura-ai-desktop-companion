@@ -41,6 +41,13 @@ if (args.Length == 1 && args[0] == LivePermissionVerification.Command)
     return;
 }
 
+if (args.Length == 1 && args[0] == LivePermissionVerification.ProductionCommand)
+{
+    Environment.ExitCode = await LivePermissionVerification.RunProductionAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 if (args.Length == 1 && args[0] == LiveExecutionStateVerification.Command)
 {
     Environment.ExitCode = await LiveExecutionStateVerification.RunAsync(
@@ -131,6 +138,7 @@ await RuntimeReadinessConsolidationChecks.RunAsync(Check);
 await ProductionRuntimeCompositionChecks.RunAsync(Check);
 await ProductionOwnershipCompositionChecks.RunAsync(Check);
 await ProductionPermissionCompositionChecks.RunAsync(Check);
+await ProductionPermissionEvidenceChecks.RunAsync(Check);
 await ProductionExecutionStateCompositionChecks.RunAsync(Check);
 await ProductionAuditSinkCompositionChecks.RunAsync(Check);
 await ProductionAuditDeliveryCompositionChecks.RunAsync(Check);
