@@ -79,8 +79,9 @@ internal static class FinalProductionActivationGateChecks
             "20261014000001_AddActionExecutionStates.cs",
             "20261014000002_AddSecurityPersistenceBundle.cs",
             "20261014000003_AddSecurityAuditOutbox.cs",
-            "20261014000004_HardenSecurityAuditOutboxDelivery.cs" }),
-            "13L five targeted migrations exist in order; existence is not migration safety");
+            "20261014000004_HardenSecurityAuditOutboxDelivery.cs",
+            "20261018000000_AddTrustedVerificationFoundation.cs" }),
+            "13L original five plus pending 17N migration exist in order; existence is not migration safety");
         check(Directory.GetFiles(migrationDirectory, "*ModelSnapshot.cs").Length == 0 &&
             evidenceDocs[5].Contains("historical core schema baseline is still unresolved",
                 StringComparison.OrdinalIgnoreCase),

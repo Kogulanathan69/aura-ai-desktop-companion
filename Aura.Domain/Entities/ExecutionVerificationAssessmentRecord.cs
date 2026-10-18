@@ -11,6 +11,7 @@ public sealed class ExecutionVerificationAssessmentRecord
     public string ToolId { get; set; } = string.Empty;
     public Guid ApprovalId { get; set; }
     public Guid ExecutionId { get; set; }
+    public long? ExecutionVersion { get; set; }
     public DurableExecutionStatus ExecutionStatus { get; set; }
     public int Outcome { get; set; }
     public VerificationProofSource ProofSource { get; set; }
@@ -18,4 +19,4 @@ public sealed class ExecutionVerificationAssessmentRecord
     public DateTime AssessedAt { get; set; }
 }
 
-public enum VerificationProofSource { None = 0 }
+public enum VerificationProofSource { None = 0, OwnedProjectMetadata = 1 }

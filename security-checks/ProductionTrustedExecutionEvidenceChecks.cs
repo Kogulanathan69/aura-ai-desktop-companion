@@ -70,7 +70,7 @@ internal static class ProductionTrustedExecutionEvidenceChecks
             "states.TryReserveInitialAsync(ready, attempt, cancellationToken)",
             "reservedState.Version != 1",
             "AuditEventType.ExecutionReserved",
-            "handler.ExecuteAsync(new ToolInvocationRequest(action.ToolId), cancellationToken)",
+            "handler.ExecuteAsync(invocation, cancellationToken)",
             "states.TryCompleteAsync(new(action.Id, scope, action.ToolId",
             "AuditEventType.ExecutionCompleted"
         };

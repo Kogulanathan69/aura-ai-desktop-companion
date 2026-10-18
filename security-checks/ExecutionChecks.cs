@@ -62,6 +62,11 @@ internal static class ExecutionChecks
             "11R valid synthetic allow path calls exactly one handler and returns new Succeeded action");
         check(owner.Calls - beforeOwner == 2 && permission.Calls > 0 && policy.Calls > 0 && handler.Request?.ToolId == toolId,
             "11R ownership twice, permission, policy and exact tool ID checked before handler");
+        check(handler.Request?.Target?.ProjectId == scope.ProjectId &&
+            typeof(OwnedProjectTarget).GetProperties().Select(x => x.Name).SequenceEqual(["ProjectId"]) &&
+            typeof(OwnedProjectTarget).GetProperties().All(x => x.SetMethod is null) &&
+            typeof(ToolInvocationRequest).GetProperties().All(x => x.SetMethod is null),
+            "17N handler receives immutable approved project target after reservation");
         check(evidence.Id.Value != Guid.Empty && done.ToolExecutionId == evidence.Id.Value &&
             evidence.Outcome == ExecutionOutcome.Succeeded,
             "11R server execution ID links immutable action/evidence");

@@ -100,7 +100,7 @@ internal static class SecurityPersistenceBundleChecks
             db.Model.FindEntityType(typeof(Verification))!.GetTableName() == "Verifications",
             "13E dedicated verification table preserves generic Verifications");
         check(Fields(verification).SetEquals(new[] { "Id", "ActionId", "UserId", "ConversationId",
-            "ProjectId", "ToolId", "ApprovalId", "ExecutionId", "ExecutionStatus", "Outcome",
+            "ProjectId", "ToolId", "ApprovalId", "ExecutionId", "ExecutionVersion", "ExecutionStatus", "Outcome",
             "ProofSource", "ProofVersion", "AssessedAt" }),
             "13E verification carries exact execution, scope, assessment and proof marker fields");
         check(verification.FindProperty("ToolId")!.GetMaxLength() == 64 &&
@@ -155,8 +155,10 @@ internal static class SecurityPersistenceBundleChecks
             (typeof(ExecutionVerificationAssessmentRecord), "ExecutionVerificationAssessments") })
         {
             var operation = migration.UpOperations.OfType<CreateTableOperation>().Single(x => x.Name == table);
-            check(operation.Columns.Select(x => x.Name).ToHashSet().SetEquals(
-                    Fields(model.FindEntityType(type)!)) &&
+            var originalFields = Fields(model.FindEntityType(type)!);
+            if (table == "ExecutionVerificationAssessments")
+                originalFields.Remove("ExecutionVersion");
+            check(operation.Columns.Select(x => x.Name).ToHashSet().SetEquals(originalFields) &&
                 operation.CheckConstraints.Count == 3 &&
                 operation.ForeignKeys.All(x => x.OnDelete ==
                     Microsoft.EntityFrameworkCore.Migrations.ReferentialAction.Restrict),

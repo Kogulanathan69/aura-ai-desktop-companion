@@ -78,7 +78,9 @@ internal static class ToolChecks
             "11N every descriptor disabled and requires approval/owned scope");
         check(result.Message == "Tool execution is disabled." && !result.Message.Contains("secret"),
             "11N potentially secret handler exceptions cannot reach result");
-        check(typeof(ToolInvocationRequest).GetProperties().Select(x => x.Name).SequenceEqual(new[] { "ToolId" }),
+        check(typeof(ToolInvocationRequest).GetProperties().Select(x => x.Name)
+                .ToHashSet().SetEquals(["ToolId", "Target"]) &&
+            typeof(ToolInvocationRequest).GetProperties().All(x => x.SetMethod is null),
             "11N request contains no arguments/paths/commands/URLs/permission/approval flags");
         check(typeof(ToolExecutionResult).GetConstructors().Length == 0 &&
             typeof(ToolExecutionResult).GetProperties().All(x => x.SetMethod is null),

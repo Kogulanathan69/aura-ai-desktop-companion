@@ -63,7 +63,35 @@ public sealed record ToolDescriptor
 }
 
 // No arguments or authorization flags. Tool-specific schemas and server-owned scope are deferred.
-public sealed record ToolInvocationRequest(ToolIdentifier ToolId);
+public sealed class ToolInvocationRequest
+{
+    // Only the trusted workflow can attach the approved, reserved project target.
+    // Targetless requests remain possible for disabled/test paths and grant nothing.
+    public ToolIdentifier ToolId { get; }
+    public OwnedProjectTarget? Target { get; }
+
+    public ToolInvocationRequest(ToolIdentifier toolId)
+    {
+        // Preserve the disabled dispatcher boundary for malformed targetless requests.
+        ToolId = toolId;
+    }
+
+    private ToolInvocationRequest(ToolIdentifier toolId, OwnedProjectTarget target)
+    {
+        ToolId = toolId;
+        Target = target;
+    }
+
+    internal static ToolInvocationRequest? FromReserved(ToolIdentifier toolId,
+        Aura.Application.Actions.ActionDescriptor action,
+        Aura.Application.Approvals.ApprovalEvidence approval,
+        Aura.Application.Executions.ActionExecutionState reserved)
+    {
+        if (toolId is null || toolId != action?.ToolId) return null;
+        var target = OwnedProjectTarget.FromReserved(action, approval, reserved);
+        return target is null ? null : new(toolId, target);
+    }
+}
 public enum ToolExecutionStatus { Success, Disabled, UnknownTool, InvalidRequest, PermissionDenied, ApprovalRequired, Failed }
 
 public sealed record ToolExecutionResult

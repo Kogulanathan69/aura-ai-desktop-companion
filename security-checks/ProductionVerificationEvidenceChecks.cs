@@ -131,9 +131,9 @@ internal static class ProductionVerificationEvidenceChecks
         check(!contracts.Contains("long Version", StringComparison.Ordinal) &&
             !typeof(ExecutionEvidenceInput).GetProperties().Any(x => x.Name is
                 "ProofSource" or "ProofVersion" or "ExecutionVersion") &&
-            !typeof(ExecutionVerificationAssessmentRecord).GetProperties().Any(x =>
+            typeof(ExecutionVerificationAssessmentRecord).GetProperties().Any(x =>
                 x.Name == "ExecutionVersion"),
-            "15G no version-bound independent evidence contract or assessment field exists");
+            "15G historical evidence contract still lacks a live adapter despite pending version field");
 
         var options = new DbContextOptionsBuilder<AuraDbContext>()
             .UseNpgsql("Host=localhost;Database=metadata_only", npgsql => npgsql.UseVector()).Options;
@@ -146,8 +146,10 @@ internal static class ProductionVerificationEvidenceChecks
             sql.Contains("\"Outcome\" IN (1, 2)") &&
             sql.Contains("\"ProofSource\" = 0") &&
             sql.Contains("\"ProofVersion\" = 0") &&
-            Enum.GetValues<VerificationProofSource>().SequenceEqual([VerificationProofSource.None]),
-            "15G assessment schema permits only terminal Failed/Inconclusive and no independent proof");
+            sql.Contains("\"ExecutionVersion\" = 2") &&
+            Enum.GetValues<VerificationProofSource>().SequenceEqual([
+                VerificationProofSource.None, VerificationProofSource.OwnedProjectMetadata]),
+            "15G assessment schema still forbids Verified; new source remains unproven");
         check(assessment.FindPrimaryKey()!.Properties.Single().Name == "Id" &&
             !assessment.GetIndexes().Any(x => x.IsUnique && x.Properties.Any(p =>
                 p.Name is "ActionId" or "ExecutionId")),
