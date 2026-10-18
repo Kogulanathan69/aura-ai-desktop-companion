@@ -169,6 +169,7 @@ await ProductionPermissionCompositionChecks.RunAsync(Check);
 await ProductionPermissionEvidenceChecks.RunAsync(Check);
 await ProductionExecutionStateCompositionChecks.RunAsync(Check);
 await ProductionExecutionStateEvidenceChecks.RunAsync(Check);
+await ProductionExecutionStateRegistrationChecks.RunAsync(Check);
 await ProductionAuditSinkCompositionChecks.RunAsync(Check);
 await ProductionAuditDeliveryCompositionChecks.RunAsync(Check);
 await ProductionAuditEvidenceChecks.RunAsync(Check);
