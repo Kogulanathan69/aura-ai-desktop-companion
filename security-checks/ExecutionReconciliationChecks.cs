@@ -40,6 +40,36 @@ internal static class ExecutionReconciliationChecks
             evidence.Disposition == ExecutionReconciliationDisposition.NeedsManualReview &&
             source.Calls == 1 && policy.Calls == 1 && owner.Calls == 2,
             "11U Reserved default assessment is manual review after two ownership checks");
+        var writer = new AssessmentWriter();
+        var persisted = await new ExecutionReconciliationService(owner, source, policy, clock,
+            assessmentWriter: writer).ReconcileAsync(action.Scope, request);
+        check(persisted.Status == ExecutionReconciliationStatus.Success && writer.Calls == 1 &&
+            writer.Last?.Id.Value == persisted.Evidence?.Id.Value &&
+            writer.Last?.ObservedVersion == 1 && source.Value.State.Status == ActionExecutionStateStatus.Reserved,
+            "16F explicit writer receives exact bounded assessment without state mutation");
+        writer.Accept = false;
+        var rejectedWrite = await new ExecutionReconciliationService(owner, source, policy, clock,
+            assessmentWriter: writer).ReconcileAsync(action.Scope, request);
+        check(rejectedWrite.Status == ExecutionReconciliationStatus.Failed &&
+            rejectedWrite.Evidence is null && writer.Calls == 2 &&
+            source.Value.State.Status == ActionExecutionStateStatus.Reserved,
+            "16F persistence denial returns fixed failure without fabricating success");
+        writer.ThrowFailure = true;
+        var thrownWrite = await new ExecutionReconciliationService(owner, source, policy, clock,
+            assessmentWriter: writer).ReconcileAsync(action.Scope, request);
+        check(thrownWrite.Status == ExecutionReconciliationStatus.Failed &&
+            thrownWrite.Evidence is null && !thrownWrite.Message.Contains("secret") &&
+            source.Value.State.Status == ActionExecutionStateStatus.Reserved,
+            "16F writer exception is bounded and leaves execution state untouched");
+        writer.ThrowFailure = false;
+        writer.ThrowCancellation = true;
+        var writerCancelled = false;
+        try { await new ExecutionReconciliationService(owner, source, policy, clock,
+            assessmentWriter: writer).ReconcileAsync(action.Scope, request); }
+        catch (OperationCanceledException) { writerCancelled = true; }
+        check(writerCancelled && source.Value.State.Status == ActionExecutionStateStatus.Reserved,
+            "16F writer cancellation propagates without fabricating completion");
+        writer.ThrowCancellation = false;
         check(evidence.Id.Value != Guid.Empty && evidence.ActionId == action.Id &&
             evidence.Scope.UserId == action.Scope.UserId &&
             evidence.Scope.ConversationId == action.Scope.ConversationId &&
@@ -188,7 +218,8 @@ internal static class ExecutionReconciliationChecks
                 .Select(x => x.ParameterType).SequenceEqual(
                     [typeof(IExecutionReconciliationScopeValidator), typeof(IExecutionReconciliationSource),
                         typeof(IExecutionReconciliationPolicy), typeof(IDateTimeProvider),
-                        typeof(Aura.Application.Auditing.IAuditEventWriter)]) &&
+                        typeof(Aura.Application.Auditing.IAuditEventWriter),
+                        typeof(IExecutionReconciliationAssessmentWriter)]) &&
             typeof(AiChatRequest).GetProperties().Select(x => x.Name).SequenceEqual(["Prompt"]) &&
             new[] { typeof(AiChatService), typeof(AiProviderRouter) }.All(type =>
                 type.GetConstructors().Single().GetParameters().All(parameter =>
@@ -242,5 +273,20 @@ internal static class ExecutionReconciliationChecks
     private sealed class Clock : IDateTimeProvider
     {
         public DateTime UtcNow => new(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc);
+    }
+    private sealed class AssessmentWriter : IExecutionReconciliationAssessmentWriter
+    {
+        public int Calls;
+        public bool Accept = true;
+        public bool ThrowFailure, ThrowCancellation;
+        public ExecutionReconciliationEvidence? Last;
+        public Task<bool> WriteAsync(ExecutionReconciliationEvidence evidence, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            Calls++; Last = evidence;
+            if (ThrowCancellation) throw new OperationCanceledException();
+            if (ThrowFailure) throw new InvalidOperationException("secret writer failure");
+            return Task.FromResult(Accept);
+        }
     }
 }

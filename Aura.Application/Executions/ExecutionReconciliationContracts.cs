@@ -154,3 +154,10 @@ public interface IExecutionReconciliationService
     Task<ExecutionReconciliationResult> ReconcileAsync(ActionScope scope,
         ExecutionReconciliationRequest request, CancellationToken cancellationToken = default);
 }
+
+// Historical assessment persistence only; this contract cannot mutate execution state.
+public interface IExecutionReconciliationAssessmentWriter
+{
+    Task<bool> WriteAsync(ExecutionReconciliationEvidence evidence,
+        CancellationToken cancellationToken);
+}

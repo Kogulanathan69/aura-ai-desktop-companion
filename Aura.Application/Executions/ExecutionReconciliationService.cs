@@ -8,7 +8,8 @@ namespace Aura.Application.Executions;
 // or a durable-state mutation method.
 public sealed class ExecutionReconciliationService(IExecutionReconciliationScopeValidator scopes,
     IExecutionReconciliationSource source, IExecutionReconciliationPolicy policy,
-    IDateTimeProvider clock, IAuditEventWriter? auditWriter = null) : IExecutionReconciliationService
+    IDateTimeProvider clock, IAuditEventWriter? auditWriter = null,
+    IExecutionReconciliationAssessmentWriter? assessmentWriter = null) : IExecutionReconciliationService
 {
     private readonly IAuditEventWriter audit = auditWriter ?? new UnavailableAuditEventWriter();
     public async Task<ExecutionReconciliationResult> ReconcileAsync(ActionScope scope,
@@ -60,6 +61,10 @@ public sealed class ExecutionReconciliationService(IExecutionReconciliationScope
             if (issuedAt.Kind != DateTimeKind.Utc || issuedAt == default)
                 return ExecutionReconciliationResult.Denied(ExecutionReconciliationStatus.Failed);
             var evidence = ExecutionReconciliationEvidence.Issue(snapshot, disposition, issuedAt);
+            if (assessmentWriter is not null &&
+                !await assessmentWriter.WriteAsync(evidence, cancellationToken))
+                return ExecutionReconciliationResult.Denied(ExecutionReconciliationStatus.Failed);
+            cancellationToken.ThrowIfCancellationRequested();
             var result = ExecutionReconciliationResult.Success(evidence);
             await AuditObservation.RecordAsync(audit, AuditWriteRequest.Create(
                 AuditEventType.ExecutionReconciliationAssessed,

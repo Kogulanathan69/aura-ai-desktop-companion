@@ -148,8 +148,9 @@ internal static class FinalProductionCompositionGateChecks
             !api.Contains("MigrateAsync(", StringComparison.Ordinal) &&
             !api.Contains("Database.Migrate(", StringComparison.Ordinal) &&
             !api.Contains("handler.ExecuteAsync(", StringComparison.Ordinal) &&
-            !api.Contains("ProductionActivationGate", StringComparison.Ordinal),
-            "14P API has no worker, migration, direct handler or activation path");
+            api.Contains("new ProductionActivationGate()", StringComparison.Ordinal) &&
+            api.Contains("new UnavailableFinalProductionSecurityApprovalSource()", StringComparison.Ordinal),
+            "14P API has no worker, migration or direct handler; later startup gate stays unavailable");
         var defaults = new RuntimeSafetyOptions();
         check(!defaults.ProductionAdaptersEnabled && !defaults.ToolExecutionEnabled &&
             !defaults.AuditPersistenceEnabled && !defaults.SafeFileAccessEnabled &&
