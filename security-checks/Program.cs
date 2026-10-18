@@ -153,6 +153,7 @@ await ProductionOwnershipEvidenceChecks.RunAsync(Check);
 await ProductionMigrationBaselineEvidenceChecks.RunAsync(Check);
 await SameTargetMigrationBaselineChecks.RunAsync(Check);
 await DbBackedProductionRegistrationChecks.RunAsync(Check);
+await FirstSafeProductionToolChecks.RunAsync(Check);
 
 
 // --------------------------------------------------
