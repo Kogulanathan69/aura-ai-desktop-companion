@@ -182,6 +182,7 @@ await ProductionToolHandlersCompositionChecks.RunAsync(Check);
 await ProductionToolHandlersEvidenceChecks.RunAsync(Check);
 await ProductionTrustedExecutionCompositionChecks.RunAsync(Check);
 await ProductionTrustedExecutionEvidenceChecks.RunAsync(Check);
+await FinalProductionEvidenceConsolidationChecks.RunAsync(Check);
 await FinalProductionCompositionGateChecks.RunAsync(Check);
 await FinalProductionReadinessChecks.RunAsync(Check);
 await FinalProductionActivationGateChecks.RunAsync(Check);
