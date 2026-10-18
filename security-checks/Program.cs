@@ -176,6 +176,7 @@ await ProductionReconciliationCompositionChecks.RunAsync(Check);
 await ProductionReconciliationEvidenceChecks.RunAsync(Check);
 await ProductionVerificationCompositionChecks.RunAsync(Check);
 await ProductionVerificationEvidenceChecks.RunAsync(Check);
+await ProductionExecutionPolicyEvidenceChecks.RunAsync(Check);
 await ProductionExecutionPolicyCompositionChecks.RunAsync(Check);
 await ProductionToolHandlersCompositionChecks.RunAsync(Check);
 await ProductionTrustedExecutionCompositionChecks.RunAsync(Check);
