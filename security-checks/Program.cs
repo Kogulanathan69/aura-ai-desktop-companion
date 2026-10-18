@@ -71,6 +71,13 @@ if (args.Length == 1 && args[0] == LiveProductionReconciliationEvidence.Command)
     return;
 }
 
+if (args.Length == 1 && args[0] == LiveProductionVerificationEvidence.Command)
+{
+    Environment.ExitCode = await LiveProductionVerificationEvidence.RunAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 if (args.Length == 1 && args[0] == LiveAuditOutboxVerification.Command)
 {
     Environment.ExitCode = await LiveAuditOutboxVerification.RunAsync(
@@ -168,6 +175,7 @@ await ProductionAuditEvidenceChecks.RunAsync(Check);
 await ProductionReconciliationCompositionChecks.RunAsync(Check);
 await ProductionReconciliationEvidenceChecks.RunAsync(Check);
 await ProductionVerificationCompositionChecks.RunAsync(Check);
+await ProductionVerificationEvidenceChecks.RunAsync(Check);
 await ProductionExecutionPolicyCompositionChecks.RunAsync(Check);
 await ProductionToolHandlersCompositionChecks.RunAsync(Check);
 await ProductionTrustedExecutionCompositionChecks.RunAsync(Check);
