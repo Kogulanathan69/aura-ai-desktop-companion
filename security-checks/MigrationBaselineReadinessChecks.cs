@@ -26,12 +26,13 @@ internal static class MigrationBaselineReadinessChecks
             "20261014000001_AddActionExecutionStates.cs",
             "20261014000002_AddSecurityPersistenceBundle.cs",
             "20261014000003_AddSecurityAuditOutbox.cs",
-            "20261014000004_HardenSecurityAuditOutboxDelivery.cs"
+            "20261014000004_HardenSecurityAuditOutboxDelivery.cs",
+            "20261018000000_AddTrustedVerificationFoundation.cs"
         };
 
         check(
             migrationFiles.SequenceEqual(expected),
-            "13J current targeted migration sequence is exact and ordered");
+            "13J targeted migrations remain ordered before pending 17N source");
 
         check(
             string.CompareOrdinal(expected[0], expected[1]) < 0 &&

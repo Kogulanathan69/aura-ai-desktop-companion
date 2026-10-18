@@ -140,3 +140,10 @@ public interface IVerificationWorkflowService
     Task<VerificationOperationResult> VerifyAsync(ActionScope scope, ActionDescriptor action,
         ApprovalEvidence approval, VerificationRequest request, CancellationToken cancellationToken = default);
 }
+
+// Advisory persistence only. A saved assessment is not independent proof.
+public interface IExecutionVerificationAssessmentWriter
+{
+    Task<bool> WriteAsync(VerificationEvidence evidence, long executionVersion,
+        CancellationToken cancellationToken);
+}

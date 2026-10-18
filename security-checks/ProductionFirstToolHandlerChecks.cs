@@ -15,13 +15,13 @@ internal static class ProductionFirstToolHandlerChecks
         var inspector = File.ReadAllText(Path.Combine(root, "Aura.Api", "Security",
             "ProductionRuntimeCompositionInspector.cs"));
         check(typeof(ToolInvocationRequest).GetProperties().Select(x => x.Name)
-                .SequenceEqual(["ToolId"]) &&
-            contracts.Contains("record ToolInvocationRequest(ToolIdentifier ToolId)") &&
-            trusted.Contains("new ToolInvocationRequest(action.ToolId)") &&
+                .ToHashSet().SetEquals(["ToolId", "Target"]) &&
+            contracts.Contains("class ToolInvocationRequest") &&
+            trusted.Contains("ToolInvocationRequest.FromReserved(") &&
             !api.Contains("AddScoped<IToolHandler") &&
             inspector.Contains("Array.Empty<(Type, string, ToolCapability, ToolPermissionRequirement)>()") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).ToolHandlers,
-            "17H no trusted resource target, production handler or reviewed registry entry");
+            "17H historical gap now has a target foundation but no production handler or catalog entry");
         return Task.CompletedTask;
     }
 }

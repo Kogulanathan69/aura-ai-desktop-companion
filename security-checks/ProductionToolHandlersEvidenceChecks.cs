@@ -79,7 +79,9 @@ internal static class ProductionToolHandlersEvidenceChecks
             catch (OperationCanceledException) { propagated = true; }
             check(propagated, "15I dispatcher propagates cancellation before handler");
         }
-        check(typeof(ToolInvocationRequest).GetProperties().Select(p => p.Name).SequenceEqual(["ToolId"]) &&
+        check(typeof(ToolInvocationRequest).GetProperties().Select(p => p.Name)
+                .ToHashSet().SetEquals(["ToolId", "Target"]) &&
+            typeof(ToolInvocationRequest).GetProperties().All(p => p.SetMethod is null) &&
             typeof(ToolExecutionResult).GetConstructors().Length == 0 &&
             typeof(ToolExecutionResult).GetProperties().Select(p => p.Name).SequenceEqual(["Status", "Message"]) &&
             typeof(ToolExecutionResult).GetProperties().All(p => p.SetMethod is null) &&

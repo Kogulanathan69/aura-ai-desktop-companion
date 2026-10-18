@@ -95,7 +95,7 @@ internal static class ProductionTrustedExecutionCompositionChecks
             service.Contains("policy.AllowsAsync(tool, cancellationToken)", StringComparison.Ordinal) &&
             service.Contains("states.TryReserveInitialAsync(ready, attempt, cancellationToken)",
                 StringComparison.Ordinal) &&
-            service.Contains("handler.ExecuteAsync(new ToolInvocationRequest(action.ToolId), cancellationToken)",
+            service.Contains("handler.ExecuteAsync(invocation, cancellationToken)",
                 StringComparison.Ordinal) &&
             service.IndexOf("policy.AllowsAsync", StringComparison.Ordinal) <
                 service.IndexOf("states.TryReserveInitialAsync", StringComparison.Ordinal) &&

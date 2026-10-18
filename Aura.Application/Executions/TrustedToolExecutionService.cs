@@ -78,11 +78,16 @@ public sealed class TrustedToolExecutionService(ToolRegistry tools, IToolExecuti
             var executing = action.BeginExecution(context);
             cancellationToken.ThrowIfCancellationRequested();
 
+            var invocation = ToolInvocationRequest.FromReserved(action.ToolId, action,
+                approval, reservedState);
+            if (invocation is null || invocation.Target?.ProjectId != scope.ProjectId)
+                return ExecutionOperationResult.Denied(ExecutionOperationStatus.ReconciliationRequired);
+
             ToolExecutionResult? handlerResult;
             try
             {
                 // The sole handler invocation. No dispatcher, retry or alternative handler.
-                handlerResult = await handler.ExecuteAsync(new ToolInvocationRequest(action.ToolId), cancellationToken);
+                handlerResult = await handler.ExecuteAsync(invocation, cancellationToken);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception) { handlerResult = ToolExecutionResult.FromStatus(ToolExecutionStatus.Failed); }

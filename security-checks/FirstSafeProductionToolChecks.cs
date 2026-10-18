@@ -21,12 +21,13 @@ internal static class FirstSafeProductionToolChecks
         var review = Read("STEP-17M-FIRST-SAFE-PRODUCTION-TOOL-VERIFICATION-POLICY.md");
         var inspector = Read("Aura.Api", "Security", "ProductionRuntimeCompositionInspector.cs");
 
-        check(tools.Contains("record ToolInvocationRequest(ToolIdentifier ToolId)") &&
-            executor.Contains("new ToolInvocationRequest(action.ToolId)") &&
+        check(tools.Contains("class ToolInvocationRequest") &&
+            tools.Contains("OwnedProjectTarget? Target") &&
+            executor.Contains("ToolInvocationRequest.FromReserved(") &&
             review.Contains("approved target is not carried") &&
             !tools.Contains("Dictionary<string, object>") &&
             !tools.Contains("JsonElement"),
-            "17M current handler request has no approved target or arbitrary payload");
+            "17M historical target gap is addressed by a bounded later foundation");
         check(safeFile.Contains("if (!options.Enabled)") &&
             review.Contains("SafeFileAccessEnabled` remains false") &&
             !new RuntimeSafetyOptions().SafeFileAccessEnabled,
