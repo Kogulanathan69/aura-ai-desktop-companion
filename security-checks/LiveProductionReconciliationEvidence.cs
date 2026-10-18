@@ -183,13 +183,16 @@ internal static class LiveProductionReconciliationEvidence
         await using var ownershipDb = await factory.CreateDbContextAsync(token);
         var validator = new ExactOwnershipScopeValidator(
             new FixtureCurrentUser(reserved.User), new OwnershipPersistenceSource(ownershipDb));
+        var writer = new ExecutionReconciliationAssessmentPersistenceWriter(factory);
         var service = new ExecutionReconciliationService(validator, source,
-            new ConservativeExecutionReconciliationPolicy(), new DateTimeProvider());
+            new ConservativeExecutionReconciliationPolicy(), new DateTimeProvider(),
+            assessmentWriter: writer);
         var first = await service.ReconcileAsync(scope, new(action), token);
         if (first.Status != ExecutionReconciliationStatus.Success || first.Evidence is null ||
             !EvidenceMatches(first.Evidence, reserved) ||
             !await StateMatchesAsync(factory, reserved, DurableExecutionStatus.Reserved, 1, token))
             return LiveReconciliationStage.ValidAssessment;
+        assessmentIds.Add(first.Evidence.Id.Value);
 
         // A stale or altered snapshot must fail within the application boundary.
         // A concurrent DB transition after source read remains a documented gap.
@@ -262,19 +265,10 @@ internal static class LiveProductionReconciliationEvidence
             first.Evidence.Id.Value == second.Evidence.Id.Value ||
             !await StateMatchesAsync(factory, reserved, DurableExecutionStatus.Reserved, 1, token))
             return LiveReconciliationStage.RepeatedAssessment;
+        assessmentIds.Add(second.Evidence.Id.Value);
 
-        // No production assessment writer exists. Persist the two generated bounded
-        // evidence records directly through EF to verify the current table only.
-        await using (var db = await factory.CreateDbContextAsync(token))
-        {
-            foreach (var evidence in new[] { first.Evidence, second.Evidence })
-            {
-                assessmentIds.Add(evidence.Id.Value);
-                db.ExecutionReconciliationAssessments.Add(ToRecord(evidence));
-            }
-            if (await db.SaveChangesAsync(token) != 2)
-                return LiveReconciliationStage.Persistence;
-        }
+        // ReconciliationService used the real persistence writer. Read back both
+        // generated rows independently; fixture cleanup also covers a failed write.
         await using (var db = await factory.CreateDbContextAsync(token))
         {
             var rows = await db.ExecutionReconciliationAssessments.AsNoTracking()
@@ -371,8 +365,13 @@ internal static class LiveProductionReconciliationEvidence
             foreach (var id in assessmentIds)
                 await db.ExecutionReconciliationAssessments.Where(x => x.Id == id)
                     .ExecuteDeleteAsync(token);
+            var generatedActions = fixtures.Select(x => x.Action).ToArray();
+            await db.ExecutionReconciliationAssessments
+                .Where(x => generatedActions.Contains(x.ActionId))
+                .ExecuteDeleteAsync(token);
             assessmentsGone = !await db.ExecutionReconciliationAssessments.AsNoTracking()
-                .AnyAsync(x => assessmentIds.Contains(x.Id), token);
+                .AnyAsync(x => assessmentIds.Contains(x.Id) ||
+                    generatedActions.Contains(x.ActionId), token);
         }
         catch (Exception) { assessmentsGone = false; }
         var fixturesGone = false;

@@ -1,0 +1,5 @@
+# Step 17I — exact production allowing policy
+
+**Result: blocked; ExecutionPolicy=false.** `IToolExecutionPolicy` currently receives only `ToolDescriptor` and cancellation; `DenyToolExecutionPolicy` is the only concrete production behavior. There is no reviewed 17H handler ID, target class or capability/permission tuple to allow. An `AllowAll`, unknown tool or synthetic test policy cannot become the production catalog entry.
+
+A later policy must default deny, name one canonical reviewed tool ID, check exact `ProjectRead`/`OwnedProjectRead` metadata for the selected handler, and reject unknown or malformed metadata. If target-specific allowance matters, extend its request with the smallest immutable server-bound action/scope/target context before implementing the policy. Ownership, permission and approval remain separate mandatory gates; none alone is an allow decision. No allowing policy, normal-startup registration, catalog entry or fallback was added. Runtime flags and activation remain disabled.

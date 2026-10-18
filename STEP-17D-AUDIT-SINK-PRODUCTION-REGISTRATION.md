@@ -1,0 +1,5 @@
+# Step 17D — audit sink production registration
+
+**Result: blocked; AuditSink=false.** `IAuditEventSink -> SecurityAuditPersistenceSink` is the exact scoped candidate. It writes one bounded `SecurityAuditEvents` row through `IDbContextFactory<AuraDbContext>` and accepts an exact duplicate event ID only when all typed fields match. It is separate from `ActionExecutionStatePersistenceStore`, which stages a Pending outbox intent in the state transaction. A direct sink write is not proof of outbox delivery.
+
+Step 14I permits AuditSink review independently of AuditDelivery. The blocker here is not dispatcher replay: the API has no context factory, sink descriptor or reviewed sink catalog entry, and Step 15E/16E contain no target-bound live audit result or approved target baseline. Append-only retention, duplicate handling and sink failure policy also need review. The gated `--live-production-audit-evidence` command was not run: no verified disposable target or gates were present. No sink registration or catalog entry was added. AuditDelivery remains independently false, and all runtime flags remain false.

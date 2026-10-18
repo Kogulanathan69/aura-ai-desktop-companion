@@ -1,0 +1,5 @@
+# Step 17E — audit delivery production registration
+
+**Result: blocked; AuditDelivery=false.** The exact candidate is scoped `IAuditOutboxDispatcher -> SecurityAuditOutboxDispatcher`. It explicitly locks and attempts one Pending outbox row, calls an injected sink once, and conditionally records Delivered or Failed. There is no polling worker or automatic retry. Its dependency graph needs the context factory and reviewed sink; neither is registered in normal startup.
+
+Step 14J requires a reviewed recovery/idempotency contract. A sink can commit its effect before the dispatcher commits Delivered; a crash or ambiguous failure then leaves Pending. A later explicit attempt can repeat an external effect. Exact-ID idempotency of the current database sink covers matching database events, not arbitrary external sinks. No general replay guarantee, operator recovery policy or target-bound live result is approved. We therefore did not add dispatcher DI or a reviewed catalog entry. No live audit command ran because the disposable target and gates were absent. AuditSink and AuditDelivery remain separate fields; runtime activation remains denied.
