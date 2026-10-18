@@ -1,0 +1,7 @@
+# Step 17C — permission production registration
+
+**Result: blocked; Permission=false.** The exact contract is `IToolPermissionSource`; the intended concrete type is scoped `ToolPermissionPersistenceSource`. Its bounded query requires exact internal user, conversation, project, canonical tool ID, required permission, active grant status and `RevokedAt == null`; it also checks active user and owned project/conversation. The grant model and EF constraints require a revoked grant to have a revocation time. There is no permissive fallback in the source.
+
+Step 15C recorded `REVOKED GRANT CHECK: NOT PROVEN` and `RESULT: INCOMPLETE`: the reviewed run lacked a real revoked-grant fixture. A positive active-grant lookup and synthetic negative checks cannot replace that evidence. A later read-only run must supply a genuine revoked grant ID, verify active and revoked rows and wrong user/conversation/project/tool/permission denials on a verified disposable target, and capture a sanitized target-bound result. Its command is `--live-production-permission-evidence`. No applicable live gates or fixtures were available here.
+
+The normal API has no scoped `IToolPermissionSource` descriptor and the exact `ReviewedPermission` catalog is empty. Adding either before the revoked-case and migration review would overstate production readiness. No registration or catalog entry was added. Runtime flags and all other composition fields remain unchanged; activation stays denied.
