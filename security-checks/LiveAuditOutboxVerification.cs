@@ -13,6 +13,10 @@ internal static class LiveAuditOutboxVerification
     internal const string EnableVariable = "AURA_LIVE_AUDIT_OUTBOX_VERIFY";
     internal const string DisposableVariable = "AURA_AUDIT_OUTBOX_DB_IS_DISPOSABLE";
     internal const string ConnectionVariable = "AURA_AUDIT_OUTBOX_DISPOSABLE_CONNECTION";
+    internal const string ProductionCommand = "--live-production-audit-evidence";
+    internal const string ProductionEnableVariable = "AURA_LIVE_PRODUCTION_AUDIT_EVIDENCE";
+    internal const string ProductionDisposableVariable = "AURA_PRODUCTION_EVIDENCE_DB_IS_DISPOSABLE";
+    internal const string ProductionConnectionVariable = "ConnectionStrings__DefaultConnection";
     private const string DatabasePrefix = "aura_disposable_";
 
     internal static async Task<int> RunAsync(Func<string, string?> environment, Action<string> write,
@@ -40,6 +44,53 @@ internal static class LiveAuditOutboxVerification
         catch (Exception)
         {
             write("LIVE AUDIT OUTBOX VERIFY: FAIL");
+            return 1;
+        }
+    }
+
+    internal static async Task<int> RunProductionAsync(Func<string, string?> environment,
+        Action<string> write,
+        Func<string, CancellationToken, Task<(bool Passed, bool? Cleanup)>>? execute = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (environment(ProductionEnableVariable) != "true" ||
+                environment(ProductionDisposableVariable) != "true")
+            {
+                write("PRODUCTION AUDIT EVIDENCE: SKIPPED");
+                return 0;
+            }
+            var connection = environment(ProductionConnectionVariable);
+            if (!ValidConnection(connection))
+            {
+                write("DB CONNECTIVITY: FAIL");
+                write("RESULT: FAIL");
+                return 1;
+            }
+            async Task<(bool Passed, bool? Cleanup)> Live(string value, CancellationToken token)
+            {
+                bool? cleanup = null;
+                var passed = await ExecuteLiveAsync(value, token, result => cleanup = result);
+                return (passed, cleanup);
+            }
+            var result = await (execute ?? Live)(connection!, cancellationToken);
+            if (!result.Passed || result.Cleanup != true)
+            {
+                if (result.Cleanup == false) write("CLEANUP: FAIL");
+                write("RESULT: FAIL");
+                return 1;
+            }
+            foreach (var category in new[] { "DB CONNECTIVITY", "SCHEMA CHECK",
+                "AUDIT PERSISTENCE", "EVENT/OUTBOX BINDING", "DELIVERY SUCCESS",
+                "DELIVERY FAILURE", "RECOVERY/REPLAY", "IDEMPOTENCY", "CLEANUP" })
+                write(category + ": PASS");
+            write("RESULT: PASS");
+            return 0;
+        }
+        catch (Exception)
+        {
+            write("RESULT: FAIL");
             return 1;
         }
     }
@@ -115,8 +166,15 @@ internal static class LiveAuditOutboxVerification
             if ((await new SecurityAuditOutboxDispatcher(factory, new FixedSink(AuditSinkStatus.Unavailable))
                     .DispatchAsync(unavailable.Outbox, token)).Status != AuditOutboxDispatchStatus.Unavailable ||
                 !await StateAsync(factory, unavailable, SecurityAuditOutboxDeliveryState.Pending, 0, false, 0, token)) return false;
+            if ((await dispatcher.DispatchAsync(unavailable.Outbox, token)).Status !=
+                    AuditOutboxDispatchStatus.Delivered ||
+                (await dispatcher.DispatchAsync(unavailable.Outbox, token)).Status !=
+                    AuditOutboxDispatchStatus.NotPending ||
+                !await StateAsync(factory, unavailable, SecurityAuditOutboxDeliveryState.Delivered,
+                    1, true, 1, token)) return false;
 
             var duplicate = await AddFixtureAsync(factory, fixtures, token);
+            if (!await DuplicateOutboxEventIdRejectedAsync(factory, duplicate, token)) return false;
             await PreinsertEventAsync(factory, duplicate, false, token);
             if ((await dispatcher.DispatchAsync(duplicate.Outbox, token)).Status != AuditOutboxDispatchStatus.Delivered ||
                 !await StateAsync(factory, duplicate, SecurityAuditOutboxDeliveryState.Delivered, 1, true, 1, token)) return false;
@@ -252,6 +310,36 @@ internal static class LiveAuditOutboxVerification
         await db.SaveChangesAsync(token);
     }
 
+    private static async Task<bool> DuplicateOutboxEventIdRejectedAsync(
+        IDbContextFactory<AuraDbContext> factory, Fixture id, CancellationToken token)
+    {
+        var rejected = false;
+        await using (var db = await factory.CreateDbContextAsync(token))
+        {
+            var original = await db.SecurityAuditOutbox.AsNoTracking()
+                .SingleAsync(x => x.Id == id.Outbox, token);
+            db.SecurityAuditOutbox.Add(new SecurityAuditOutboxRecord
+            {
+                Id = Guid.NewGuid(), AuditEventId = id.Event,
+                EventType = original.EventType, Outcome = original.Outcome,
+                OccurredAt = original.OccurredAt, UserId = id.User,
+                ConversationId = id.Conversation, ProjectId = id.Project,
+                ActionId = id.Action, ToolId = original.ToolId,
+                ApprovalId = id.Approval, ExecutionId = id.Execution,
+                DeliveryState = SecurityAuditOutboxDeliveryState.Pending,
+                AttemptCount = 0
+            });
+            try { await db.SaveChangesAsync(token); }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException postgres &&
+                postgres.SqlState == PostgresErrorCodes.UniqueViolation &&
+                postgres.ConstraintName == "IX_SecurityAuditOutbox_AuditEventId") { rejected = true; }
+        }
+        if (!rejected) return false;
+        await using var verify = await factory.CreateDbContextAsync(token);
+        return await verify.SecurityAuditOutbox.AsNoTracking()
+            .CountAsync(x => x.AuditEventId == id.Event, token) == 1;
+    }
+
     private enum BindingField { User, Conversation, Project, Action, Approval, Execution }
 
     private static async Task ChangeBindingAsync(IDbContextFactory<AuraDbContext> factory,
@@ -299,10 +387,20 @@ internal static class LiveAuditOutboxVerification
         List<Fixture> fixtures, CancellationToken token)
     {
         await using var db = await factory.CreateDbContextAsync(token);
+
+        // Negative-binding scenarios can make one generated outbox temporarily
+        // reference another generated fixture. Remove every generated audit
+        // dependent first so no cross-fixture FK can block parent cleanup.
         foreach (var id in fixtures)
         {
             await db.SecurityAuditEvents.Where(x => x.Id == id.Event).ExecuteDeleteAsync(token);
             await db.SecurityAuditOutbox.Where(x => x.Id == id.Outbox).ExecuteDeleteAsync(token);
+        }
+
+        // Only after all generated audit dependents are gone is it safe to
+        // remove each generated execution/ownership fixture.
+        foreach (var id in fixtures)
+        {
             await db.ActionExecutionStates.Where(x => x.ActionId == id.Action && x.UserId == id.User).ExecuteDeleteAsync(token);
             await db.ActionApprovals.Where(x => x.Id == id.Approval && x.UserId == id.User).ExecuteDeleteAsync(token);
             await db.AIActions.Where(x => x.Id == id.Action && x.UserId == id.User).ExecuteDeleteAsync(token);
@@ -310,10 +408,12 @@ internal static class LiveAuditOutboxVerification
             await db.Projects.Where(x => x.Id == id.Project && x.UserId == id.User).ExecuteDeleteAsync(token);
             await db.Users.Where(x => x.Id == id.User && x.AuthUserId == id.AuthUser).ExecuteDeleteAsync(token);
         }
+
         foreach (var id in fixtures)
             if (await db.SecurityAuditEvents.AnyAsync(x => x.Id == id.Event, token) ||
                 await db.SecurityAuditOutbox.AnyAsync(x => x.Id == id.Outbox, token) ||
                 await db.Users.AnyAsync(x => x.Id == id.User, token)) return false;
+
         return true;
     }
 
