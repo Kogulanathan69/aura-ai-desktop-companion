@@ -90,14 +90,14 @@ internal static class FinalProductionEvidenceConsolidationChecks
         check(api.Contains("new UnavailableRuntimeCapabilityReadiness()") &&
             api.Contains("ProductionRuntimeCompositionInspector.Inspect(builder.Services)") &&
             !api.Contains("FinalProductionCompositionGateChecks") &&
-            !api.Contains("FinalSecurityApproval") &&
-            !api.Contains("ProductionActivationGate") &&
+            api.Contains("new UnavailableFinalProductionSecurityApprovalSource()") &&
+            api.Contains("new ProductionActivationGate()") &&
             !api.Contains("AddHostedService") && !api.Contains("BackgroundService") &&
             !api.Contains("MigrateAsync(") && !api.Contains("EnsureCreated(") &&
             !api.Contains("handler.ExecuteAsync(") &&
             !api.Contains("ToolExecutionEnabled = true") &&
             !api.Contains("ProductionAdaptersEnabled = true"),
-            "15K startup has observational composition only, no approval/activation/worker/migration/direct handler path");
+            "15K startup has unavailable approval and no worker/migration/direct handler path");
         check(finalGate.Contains("Review-only formula") &&
             finalGate.Contains("finalSecurityApproval") &&
             !api.Contains("FinalProductionCompositionGateChecks") &&

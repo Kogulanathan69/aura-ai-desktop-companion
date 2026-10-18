@@ -1,0 +1,9 @@
+# Step 16G — independent verification production adapter checkpoint
+
+**Decision: blocked; Verification=false.** The only production `IExecutionEvidenceSource` implementation is `UnavailableExecutionEvidenceSource`. There is no reviewed production tool from Step 16I whose postcondition can be independently observed. Choosing a generic adapter now would risk treating a handler's own Success report as independent proof. No proof adapter, assessment writer, registration, catalog entry or migration is added.
+
+The current `ExecutionEvidenceInput` binds execution/action/scope/tool/approval and time, but has no durable execution version, proof source, proof version or independent provenance. The assessment table permits only Failed/Inconclusive with `ProofSource=None` and `ProofVersion=0`; it has no execution-version column or complete composite binding. Step 15G's truthful observed result is `INCOMPLETE`: partial negative bindings, no version proof and no independent adapter. A `Verified` outcome must not be inferred from handler Success, and the conservative policy continues to return Inconclusive for such a report. The workflow does not mutate execution state.
+
+Before implementation, choose one real minimal tool with an independently observable postcondition, define a bounded proof source/version and exact action/user/conversation/project/tool/approval/execution/version bindings, review stale/unknown proof denial, and add a reviewed migration only if objectively required. Then implement and test the exact adapter and assessment persistence, including every negative binding, and extend the gated `--live-production-verification-evidence` harness so it exercises the actual production adapter on a verified disposable database. No live command ran here. No synthetic proof or PASS is claimed.
+
+All production flags and composition fields remain false; activation remains unavailable.

@@ -127,8 +127,9 @@ catch (Exception)
 }
 var runtimeReadiness = new UnavailableRuntimeCapabilityReadiness();
 var runtimeSafetyValidator = new RuntimeSafetyValidator();
-if (runtimeSafetyValidator.Validate(runtimeSafetyOptions, runtimeReadiness.GetSnapshot(),
-        projectFileAccessOptions, routerOptions, openAiOptions) is
+var runtimeSafetyStatus = runtimeSafetyValidator.Validate(runtimeSafetyOptions,
+    runtimeReadiness.GetSnapshot(), projectFileAccessOptions, routerOptions, openAiOptions);
+if (runtimeSafetyStatus is
     not (RuntimeSafetyStatus.SafeDisabled or RuntimeSafetyStatus.Valid))
     throw new InvalidOperationException(RuntimeSafetyValidator.FailureMessage);
 builder.Services.AddSingleton(runtimeSafetyOptions);
@@ -144,8 +145,17 @@ builder.Services.AddDbContext<AuraDbContext>(options =>
 builder.Services.AddScoped<IAuraDbContext>(provider =>
     provider.GetRequiredService<AuraDbContext>());
 
-// Observational only: records reviewed production registrations without enabling them.
-builder.Services.AddSingleton(ProductionRuntimeCompositionInspector.Inspect(builder.Services));
+// Registration review is observational; execution also requires independent approval.
+var productionComposition = ProductionRuntimeCompositionInspector.Inspect(builder.Services);
+var finalApproval = new UnavailableFinalProductionSecurityApprovalSource();
+var productionActivationGate = new ProductionActivationGate();
+if (runtimeSafetyOptions.ToolExecutionEnabled && !productionActivationGate.CanActivate(
+        productionComposition, runtimeSafetyOptions, runtimeReadiness.GetSnapshot(),
+        runtimeSafetyStatus, finalApproval))
+    throw new InvalidOperationException(RuntimeSafetyValidator.FailureMessage);
+builder.Services.AddSingleton(productionComposition);
+builder.Services.AddSingleton<IFinalProductionSecurityApprovalSource>(finalApproval);
+builder.Services.AddSingleton(productionActivationGate);
 
 var app = builder.Build();
 app.UseExceptionHandler();
