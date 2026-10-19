@@ -76,7 +76,7 @@ internal static class FinalProductionEvidenceConsolidationChecks
         var catalogs = typeof(ProductionRuntimeCompositionInspector).GetFields(
             BindingFlags.Static | BindingFlags.NonPublic)
             .Where(f => f.Name.StartsWith("Reviewed", StringComparison.Ordinal)).ToArray();
-        check(catalogs.Length == 13 && catalogs.All(f =>
+        check(catalogs.Length == 16 && catalogs.All(f =>
             f.GetValue(null)?.GetType().GetProperty("Count")?.GetValue(f.GetValue(null)) is 0 ||
             f.GetValue(null) is Array { Length: 0 }),
             "15K all reviewed production catalogs are empty");

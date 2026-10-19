@@ -154,6 +154,7 @@ await ActionChecks.RunAsync(Check);
 await ApprovalChecks.RunAsync(Check);
 await VerificationChecks.RunAsync(Check);
 await VerifiedIndependentProofWriterChecks.RunAsync(Check);
+await VerificationConcurrencyAndRegistrationChecks.RunAsync(Check);
 await ExecutionChecks.RunAsync(Check);
 
 
