@@ -45,9 +45,9 @@ internal static class TrustedTargetVerificationFoundationChecks
         check(Enum.GetValues<VerificationProofSource>().SequenceEqual([
                 VerificationProofSource.None, VerificationProofSource.OwnedProjectMetadata]) &&
             writer.Contains("executionVersion != 2") &&
-            writer.Contains("evidence.Outcome is not (VerificationOutcome.Failed or VerificationOutcome.Inconclusive)") &&
-            writer.Contains("ProofSource = VerificationProofSource.None") &&
-            writer.Contains("ProofVersion = 0") &&
+            writer.Contains("evidence.IndependentProof is not { } proof") &&
+            writer.Contains("ProofSource = verified ? VerificationProofSource.OwnedProjectMetadata : VerificationProofSource.None") &&
+            writer.Contains("ProofVersion = verified ? 1 : 0") &&
             review.Contains("no independent proof adapter"),
             "17N bounded proof designation cannot promote handler success to Verified");
         check(writer.Contains("IDbContextFactory<AuraDbContext> factory") &&

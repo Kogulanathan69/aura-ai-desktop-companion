@@ -284,7 +284,7 @@ internal static class LiveAuditOutboxVerification
             RequestedAt = now, DecidedAt = now, CreatedAt = now });
         db.ActionExecutionStates.Add(new ActionExecutionStateRecord { ActionId = id.Action,
             UserId = id.User, ConversationId = id.Conversation, ProjectId = id.Project,
-            ToolId = "audit-outbox-check", ApprovalId = id.Approval, ExecutionId = id.Execution,
+            ToolId = tool, ApprovalId = id.Approval, ExecutionId = id.Execution,
             Status = DurableExecutionStatus.Reserved, Version = 1, ApprovalConsumed = true,
             CreatedAt = now, ReservedAt = now });
         db.SecurityAuditOutbox.Add(new SecurityAuditOutboxRecord { Id = id.Outbox,

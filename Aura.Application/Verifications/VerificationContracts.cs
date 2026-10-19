@@ -24,6 +24,7 @@ public sealed record ExecutionEvidenceInput(Guid ExecutionId, ActionIdentifier A
     // Source-owned observation; never derived from a handler result or public request.
     public long? ExecutionVersion { get; init; }
     public OwnedProjectMetadataObservation? ProjectObservation { get; init; }
+    public OwnedProjectMetadataProof? IndependentProof { get; init; }
 }
 
 // Project identity and one already persisted, bounded timestamp. No path, description,
@@ -33,9 +34,9 @@ public sealed record OwnedProjectMetadataObservation(Guid ProjectId, DateTime Up
 
 public interface IExecutionEvidenceSource
 {
-    // Future adapter returns bounded trusted evidence for exact scope and IDs;
+    // Adapter returns bounded trusted evidence for exact scope and IDs;
     // no raw handler output and no automatic Verified claim.
-    // Future adapter must attest an actual completed authorized execution, exact bindings
+    // Adapter must attest an actual completed authorized execution, exact bindings
     // and current evidence provenance. Return null for unavailable/untrusted execution.
     // Must scope before reading, never execute a tool to manufacture evidence.
     Task<ExecutionEvidenceInput?> GetAsync(ActionScope scope, Guid executionId, CancellationToken cancellationToken);
@@ -66,7 +67,7 @@ public interface IVerificationScopeValidator
 public interface IIndependentVerificationPolicy
 {
     // Verified requires independently established tool-specific proof, not Outcome=Succeeded.
-    // No production proof adapter exists. Never execute a tool here to generate that proof.
+    // Conservative production policy does not issue Verified. Never execute a tool here to generate proof.
     Task<VerificationOutcome> EvaluateAsync(ExecutionEvidenceInput execution, CancellationToken cancellationToken);
 }
 
@@ -97,17 +98,29 @@ public sealed class VerificationEvidence
     public Guid ExecutionId { get; }
     public VerificationOutcome Outcome { get; }
     public DateTime IssuedAt { get; }
+    public long? ExecutionVersion { get; }
+    public ExecutionReportOutcome ExecutionReport { get; }
+    public OwnedProjectMetadataProof? IndependentProof { get; }
 
     private VerificationEvidence(ExecutionEvidenceInput execution, VerificationOutcome outcome, DateTime issuedAt)
     {
         Id = VerificationIdentifier.Create(); ActionId = execution.ActionId; Scope = execution.Scope;
         ToolId = execution.ToolId; ApprovalId = execution.ApprovalId; ExecutionId = execution.ExecutionId;
         Outcome = outcome; IssuedAt = issuedAt;
+        ExecutionVersion = execution.ExecutionVersion;
+        ExecutionReport = execution.Outcome;
+        IndependentProof = outcome == VerificationOutcome.Verified ? execution.IndependentProof : null;
     }
 
     internal static VerificationEvidence Issue(ExecutionEvidenceInput execution, VerificationOutcome outcome, DateTime issuedAt)
     {
-        if (!Enum.IsDefined(outcome) || issuedAt.Kind != DateTimeKind.Utc || issuedAt == default || issuedAt < execution.CompletedAt)
+        if (!Enum.IsDefined(outcome) || issuedAt.Kind != DateTimeKind.Utc || issuedAt == default || issuedAt < execution.CompletedAt ||
+            outcome == VerificationOutcome.Verified &&
+            (execution.Outcome != ExecutionReportOutcome.Succeeded ||
+             execution.ExecutionVersion != 2 || execution.IndependentProof is not { } proof ||
+             proof.ProjectId != execution.Scope.ProjectId ||
+             proof.ExecutionVersion != execution.ExecutionVersion ||
+             execution.ToolId.Value != "owned-project-metadata-read"))
             throw new InvalidOperationException("Invalid verification issuance.");
         return new(execution, outcome, issuedAt);
     }
@@ -158,7 +171,7 @@ public interface IVerificationWorkflowService
         ApprovalEvidence approval, VerificationRequest request, CancellationToken cancellationToken = default);
 }
 
-// Advisory persistence only. A saved assessment is not independent proof.
+// A saved assessment is historical evidence, not independent authorization.
 public interface IExecutionVerificationAssessmentWriter
 {
     Task<bool> WriteAsync(VerificationEvidence evidence, long executionVersion,

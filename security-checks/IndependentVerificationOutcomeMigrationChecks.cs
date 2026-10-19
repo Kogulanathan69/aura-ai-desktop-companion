@@ -104,8 +104,8 @@ internal static class IndependentVerificationOutcomeMigrationChecks
             apply.Contains("MigrateAsync(TargetMigration, token)") &&
             entry.Contains("args[0] == LiveIndependentVerificationOutcomeMigrationApplication.Command"),
             "17Q exact six-applied, one-pending and live identity precede operator-only migration");
-        check(writer.Contains("evidence.Outcome is not (VerificationOutcome.Failed or VerificationOutcome.Inconclusive)") &&
-            writer.Contains("ProofSource = VerificationProofSource.None") &&
+        check(writer.Contains("evidence.IndependentProof is not { } proof") &&
+            writer.Contains("ProofSource = verified ? VerificationProofSource.OwnedProjectMetadata : VerificationProofSource.None") &&
             workflow.Contains("execution.ExecutionVersion != 2") &&
             workflow.Contains("proof.ProofSource != VerificationProofSource.OwnedProjectMetadata") &&
             workflow.Contains("proof.ProofVersion != 1") &&
@@ -114,7 +114,7 @@ internal static class IndependentVerificationOutcomeMigrationChecks
             !api.Contains("AddScoped<IVerificationWorkflowService,") &&
             !writer.Contains("ExecuteUpdate") && !writer.Contains("while (") &&
             !writer.Contains("Task.Delay"),
-            "17Q writer stays advisory-only; wrong/missing proof and stale version cannot promote");
+            "17R writer requires proof; wrong/missing proof and stale version cannot promote");
         check(review.Contains("OPERATOR-REPORTED LIVE RESULT: PASS") &&
             review.Contains("INDEPENDENT VERIFICATION MIGRATION APPLY: PASS") &&
             review.Contains("MIGRATION HISTORY: PASS") &&
@@ -126,14 +126,12 @@ internal static class IndependentVerificationOutcomeMigrationChecks
             review.Contains("live independent-verification writer path remains **INCOMPLETE**"),
             "17Q review records bounded operator same-target PASS without claiming a writer run");
         check(contracts.Contains("public sealed class VerificationEvidence") &&
-            !contracts.Contains("public OwnedProjectMetadataObservation? ProjectObservation { get; }") &&
-            !contracts.Contains("public VerificationProofSource ProofSource { get; }") &&
-            !contracts.Contains("public int ProofVersion { get; }") &&
-            !contracts.Contains("public long ExecutionVersion { get; }") &&
+            contracts.Contains("public OwnedProjectMetadataProof? IndependentProof { get; }") &&
+            contracts.Contains("public long? ExecutionVersion { get; }") &&
             writer.Contains("WriteAsync(VerificationEvidence evidence, long executionVersion") &&
             review.Contains("server-issued, immutable proof-bearing `VerificationEvidence`") &&
             review.Contains("writer must recheck those exact bindings"),
-            "17Q immutable independent proof is not carried to writer; Verified stays unsupported");
+            "17R immutable proof reaches writer while historical Step 17Q review remains accurate");
         var snapshot = ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection());
         var flags = new RuntimeSafetyOptions();
         check(!snapshot.Verification && !snapshot.ToolHandlers && !snapshot.ExecutionPolicy &&

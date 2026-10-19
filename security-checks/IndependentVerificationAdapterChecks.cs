@@ -66,14 +66,14 @@ internal static class IndependentVerificationAdapterChecks
             prior.Sql.Contains("\"Outcome\" IN (1, 2)") &&
             !prior.Sql.Contains("\"Outcome\" = 0"),
             "17P pending migration changes only bounded Verified check constraint");
-        check(writer.Contains("evidence.Outcome is not (VerificationOutcome.Failed or VerificationOutcome.Inconclusive)") &&
-            writer.Contains("ProofSource = VerificationProofSource.None") &&
+        check(writer.Contains("evidence.IndependentProof is not { } proof") &&
+            writer.Contains("ProofSource = verified ? VerificationProofSource.OwnedProjectMetadata : VerificationProofSource.None") &&
             !api.Contains("AddScoped<IExecutionEvidenceSource,") &&
             !api.Contains("AddScoped<IExecutionVerificationAssessmentWriter,") &&
             !api.Contains("AddScoped<IVerificationWorkflowService,") &&
             !api.Contains("MigrateAsync(") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Verification,
-            "17P writer remains advisory-only and production graph unregistered while migration pending");
+            "17R proof-bound writer and production graph remain unregistered");
         check(ProductionMigrationBaselineEvidence.ExpectedMigrations.Length == 7 &&
             outcomeReview.Contains("OPERATOR-REPORTED LIVE RESULT: PASS") &&
             outcomeReview.Contains("Verification=false") &&
