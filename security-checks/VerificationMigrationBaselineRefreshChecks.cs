@@ -16,7 +16,7 @@ internal static class VerificationMigrationBaselineRefreshChecks
         var program = Read("security-checks", "Program.cs");
         var review = Read("STEP-17O-VERIFICATION-MIGRATION-BASELINE-REFRESH.md");
         var migrations = ProductionMigrationBaselineEvidence.ExpectedMigrations;
-        check(migrations.SequenceEqual([
+        check(migrations[..^1].SequenceEqual([
                 "20261014000000_AddToolPermissionGrants",
                 "20261014000001_AddActionExecutionStates",
                 "20261014000002_AddSecurityPersistenceBundle",
@@ -115,7 +115,7 @@ internal static class VerificationMigrationBaselineRefreshChecks
             !LiveVerificationMigrationApplication.MatchesIdentity(
                 "aura_disposable_test", 24576, 7696813047573034173, 24576, 7696813047573034172),
             "17O wrong OID or system identifier fails exact identity comparison");
-        var expectedApplied = ProductionMigrationBaselineEvidence.ExpectedMigrations[..^1];
+        var expectedApplied = ProductionMigrationBaselineEvidence.ExpectedMigrations[..^2];
         check(LiveVerificationMigrationApplication.MatchesPreMigrationState(
                 expectedApplied, [LiveVerificationMigrationApplication.TargetMigration]) &&
             !LiveVerificationMigrationApplication.MatchesPreMigrationState(

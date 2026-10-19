@@ -17,7 +17,8 @@ internal static class ProductionMigrationBaselineEvidence
         "20261014000002_AddSecurityPersistenceBundle",
         "20261014000003_AddSecurityAuditOutbox",
         "20261014000004_HardenSecurityAuditOutboxDelivery",
-        "20261018000000_AddTrustedVerificationFoundation"
+        "20261018000000_AddTrustedVerificationFoundation",
+        "20261019000000_AddIndependentVerificationOutcome"
     ];
     internal const string HardenedDeliveryExpression =
         "(\"DeliveryState\" = 0 AND \"AttemptCount\" = 0 AND \"DeliveredAt\" IS NULL) OR " +
@@ -28,6 +29,13 @@ internal static class ProductionMigrationBaselineEvidence
         "((\"ExecutionVersion\" IS NULL AND \"ProofSource\" = 0 AND \"ProofVersion\" = 0) OR " +
         "(\"ExecutionVersion\" = 2 AND ((\"ProofSource\" = 0 AND \"ProofVersion\" = 0) OR " +
         "(\"ProofSource\" = 1 AND \"ProofVersion\" = 1))))";
+    internal const string IndependentVerificationOutcomeExpression =
+        "(\"ExecutionStatus\" IN (2, 3) AND \"Outcome\" IN (1, 2) AND " +
+        "((\"ExecutionVersion\" IS NULL AND \"ProofSource\" = 0 AND \"ProofVersion\" = 0) OR " +
+        "(\"ExecutionVersion\" = 2 AND ((\"ProofSource\" = 0 AND \"ProofVersion\" = 0) OR " +
+        "(\"ProofSource\" = 1 AND \"ProofVersion\" = 1))))) OR " +
+        "(\"ExecutionStatus\" = 2 AND \"Outcome\" = 0 AND \"ExecutionVersion\" = 2 AND " +
+        "\"ProofSource\" = 1 AND \"ProofVersion\" = 1)";
 
     internal enum Stage
     {
@@ -249,7 +257,9 @@ internal static class ProductionMigrationBaselineEvidence
                     StringComparison.Ordinal) ||
                  !definition.Contains("proofsource=1andproofversion=1",
                     StringComparison.Ordinal) ||
-                 definition.Contains("outcome=0", StringComparison.Ordinal)))
+                 !definition.Contains("executionstatus=2andoutcome=0andexecutionversion=2andproofsource=1andproofversion=1",
+                    StringComparison.Ordinal) ||
+                 definition.Split("outcome=0", StringSplitOptions.None).Length != 2))
                 return Stage.IncompatibleConstraint;
         }
         return Stage.Passed;

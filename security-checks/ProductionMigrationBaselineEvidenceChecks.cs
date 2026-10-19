@@ -187,6 +187,29 @@ internal static class ProductionMigrationBaselineEvidenceChecks
                         "\"ProofSource\" = 1 AND \"ProofVersion\" = 0", StringComparison.Ordinal) } : x).ToArray()
         }) == ProductionMigrationBaselineEvidence.Stage.IncompatibleConstraint,
             "17O mismatched proof source/version pair fails");
+        check(ProductionMigrationBaselineEvidence.Evaluate(baseline with
+        {
+            Constraints = baseline.Constraints.Select(x =>
+                x.Name == "CK_ExecutionVerificationAssessments_State"
+                    ? x with { Definition = "CHECK (" +
+                        ProductionMigrationBaselineEvidence.VerificationFoundationExpression + ")" }
+                    : x).ToArray()
+        }) == ProductionMigrationBaselineEvidence.Stage.IncompatibleConstraint,
+            "17Q pre-Verified sixth constraint cannot pass seven-ID schema baseline");
+        foreach (var (oldText, newText) in new[]
+        {
+            ("\"ExecutionStatus\" = 2 AND \"Outcome\" = 0", "\"ExecutionStatus\" = 3 AND \"Outcome\" = 0"),
+            ("\"Outcome\" = 0 AND \"ExecutionVersion\" = 2", "\"Outcome\" = 0 AND \"ExecutionVersion\" = 1"),
+            ("\"ProofSource\" = 1 AND \"ProofVersion\" = 1)", "\"ProofSource\" = 2 AND \"ProofVersion\" = 1)")
+        })
+            check(ProductionMigrationBaselineEvidence.Evaluate(baseline with
+            {
+                Constraints = baseline.Constraints.Select(x =>
+                    x.Name == "CK_ExecutionVerificationAssessments_State"
+                        ? x with { Definition = x.Definition.Replace(oldText, newText,
+                            StringComparison.Ordinal) } : x).ToArray()
+            }) == ProductionMigrationBaselineEvidence.Stage.IncompatibleConstraint,
+                "17Q wrong Verified status, execution version or proof source fails");
 
         var root = Directory.GetCurrentDirectory();
         var harness = File.ReadAllText(Path.Combine(root, "security-checks",
@@ -195,9 +218,8 @@ internal static class ProductionMigrationBaselineEvidenceChecks
         var api = File.ReadAllText(Path.Combine(root, "Aura.Api", "Program.cs"));
         var files = Directory.GetFiles(Path.Combine(root, "Aura.Infrastructure", "Data", "Migrations"),
             "*.cs").Select(Path.GetFileNameWithoutExtension).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-        check(files.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations.Concat(
-                ["20261019000000_AddIndependentVerificationOutcome"])),
-            "17P six applied baseline IDs and one pending source match exact repository order");
+        check(files.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations),
+            "17Q seven expected migration IDs match exact repository source order");
         check(program.Contains("args[0] == ProductionMigrationBaselineEvidence.Command", StringComparison.Ordinal) &&
             program.IndexOf("await ProductionMigrationBaselineEvidenceChecks.RunAsync(Check)", StringComparison.Ordinal) >
                 program.IndexOf("var checks = 0", StringComparison.Ordinal) &&
@@ -243,7 +265,7 @@ internal static class ProductionMigrationBaselineEvidenceChecks
                 name == "CK_SecurityAuditOutbox_Delivery"
                     ? "CHECK (" + ProductionMigrationBaselineEvidence.HardenedDeliveryExpression + ")"
                     : name == "CK_ExecutionVerificationAssessments_State"
-                        ? "CHECK (" + ProductionMigrationBaselineEvidence.VerificationFoundationExpression + ")"
+                        ? "CHECK (" + ProductionMigrationBaselineEvidence.IndependentVerificationOutcomeExpression + ")"
                         : "CHECK (" + string.Join(" AND ", markers) + ")"));
         var indexes = ProductionMigrationBaselineEvidence.UniqueIndexes.Select(item =>
             new ProductionMigrationBaselineEvidence.Index(item.Table, item.Name, true,
