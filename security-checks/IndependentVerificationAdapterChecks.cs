@@ -18,6 +18,7 @@ internal static class IndependentVerificationAdapterChecks
         var writer = Read("Aura.Infrastructure", "Services", "ExecutionVerificationAssessmentPersistenceWriter.cs");
         var api = Read("Aura.Api", "Program.cs");
         var migration = new AddIndependentVerificationOutcome();
+        var outcomeReview = Read("STEP-17Q-INDEPENDENT-VERIFICATION-OUTCOME-MIGRATION-AND-PERSISTENCE.md");
         check(typeof(OwnedProjectMetadataExecutionEvidenceSource).IsSealed &&
             typeof(IExecutionEvidenceSource).IsAssignableFrom(typeof(OwnedProjectMetadataExecutionEvidenceSource)) &&
             source.Contains("ExpectedTool = \"owned-project-metadata-read\"") &&
@@ -73,6 +74,11 @@ internal static class IndependentVerificationAdapterChecks
             !api.Contains("MigrateAsync(") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Verification,
             "17P writer remains advisory-only and production graph unregistered while migration pending");
+        check(ProductionMigrationBaselineEvidence.ExpectedMigrations.Length == 7 &&
+            outcomeReview.Contains("OPERATOR-REPORTED LIVE RESULT: PASS") &&
+            outcomeReview.Contains("Verification=false") &&
+            outcomeReview.Contains("Verified writer path is incomplete"),
+            "17Q seven-ID live schema evidence and pending Verified writer remain fail-closed");
         var flags = new RuntimeSafetyOptions();
         var snapshot = ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection());
         check(!snapshot.Verification && !snapshot.ToolHandlers && !snapshot.ExecutionPolicy &&

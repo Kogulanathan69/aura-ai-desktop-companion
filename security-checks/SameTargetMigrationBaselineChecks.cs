@@ -19,11 +19,12 @@ internal static class SameTargetMigrationBaselineChecks
                 "20261014000002_AddSecurityPersistenceBundle",
                 "20261014000003_AddSecurityAuditOutbox",
                 "20261014000004_HardenSecurityAuditOutboxDelivery",
-                "20261018000000_AddTrustedVerificationFoundation"
+                "20261018000000_AddTrustedVerificationFoundation",
+                "20261019000000_AddIndependentVerificationOutcome"
             ]) &&
             Directory.GetFiles(Path.Combine(root, "Aura.Infrastructure", "Data", "Migrations"),
                 "*ModelSnapshot.cs").Length == 0,
-            "17K historical five plus 17O sixth expectation; core snapshot still absent");
+            "17Q seven-ID expectation; historical core snapshot still absent");
         check(ProductionMigrationBaselineEvidence.RequiredTables.ToHashSet(StringComparer.Ordinal)
             .IsSupersetOf(new[] { "Users", "Projects", "Conversations", "ToolPermissionGrants",
                 "AIActions", "ActionApprovals", "ActionExecutionStates",
