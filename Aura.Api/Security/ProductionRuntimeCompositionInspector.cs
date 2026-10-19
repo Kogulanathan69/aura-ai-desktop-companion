@@ -6,6 +6,7 @@ using Aura.Application.Verifications;
 using Aura.Application.Common.Interfaces;
 using Aura.Infrastructure.Data;
 using Aura.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Aura.Api.Security;
@@ -36,6 +37,9 @@ public static class ProductionRuntimeCompositionInspector
     private static readonly IReadOnlySet<Type> ReviewedAuditDelivery = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedReconciliation = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedVerification = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedVerificationWriter = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedVerificationWorkflow = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedVerificationFactory = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedExecutionPolicy = new HashSet<Type>();
     private static readonly IReadOnlyList<(Type HandlerType, string ToolId, ToolCapability Capability,
         ToolPermissionRequirement Permission)> ReviewedToolHandlers =
@@ -55,7 +59,10 @@ public static class ProductionRuntimeCompositionInspector
         var auditSink = HasExactAuditSink(services);
         var auditDelivery = HasExactAuditDeliveryDispatcher(services);
         var reconciliation = HasExactReconciliationSource(services);
-        var verification = HasExactVerificationSource(services);
+        var verification = HasExactVerificationSource(services) &&
+            HasExactVerificationWriter(services) &&
+            HasExactVerificationWorkflow(services) &&
+            HasExactVerificationFactory(services);
         var executionPolicy = HasExactExecutionPolicy(services);
         var toolHandlers = MatchesReviewedToolHandlers(services, ReviewedToolHandlers);
         var trustedExecution = HasExactTrustedExecutionService(services) &&
@@ -134,8 +141,7 @@ public static class ProductionRuntimeCompositionInspector
             ReviewedReconciliation.Contains(typeof(ExecutionReconciliationPersistenceSource));
     }
 
-    // No independent production evidence adapter exists yet. A future exact type
-    // must be separately reviewed; the unavailable source can never qualify.
+    // Presence alone is insufficient: each node must be exact, scoped and reviewed.
     private static bool HasExactVerificationSource(IServiceCollection services)
     {
         var registrations = services.Where(item => item.ServiceType == typeof(IExecutionEvidenceSource))
@@ -145,6 +151,37 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].ImplementationType is { } implementation &&
             implementation != typeof(UnavailableExecutionEvidenceSource) &&
             ReviewedVerification.Contains(implementation);
+    }
+
+    private static bool HasExactVerificationWriter(IServiceCollection services)
+    {
+        var registrations = services.Where(item =>
+            item.ServiceType == typeof(IExecutionVerificationAssessmentWriter)).ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType ==
+                typeof(ExecutionVerificationAssessmentPersistenceWriter) &&
+            ReviewedVerificationWriter.Contains(typeof(ExecutionVerificationAssessmentPersistenceWriter));
+    }
+
+    private static bool HasExactVerificationWorkflow(IServiceCollection services)
+    {
+        var registrations = services.Where(item =>
+            item.ServiceType == typeof(IVerificationWorkflowService)).ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType == typeof(VerificationWorkflowService) &&
+            ReviewedVerificationWorkflow.Contains(typeof(VerificationWorkflowService));
+    }
+
+    private static bool HasExactVerificationFactory(IServiceCollection services)
+    {
+        var registrations = services.Where(item =>
+            item.ServiceType == typeof(IDbContextFactory<AuraDbContext>)).ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Singleton &&
+            registrations[0].ImplementationType is { } implementation &&
+            ReviewedVerificationFactory.Contains(implementation);
     }
 
     // No allowing production policy exists yet. The deny-only implementation

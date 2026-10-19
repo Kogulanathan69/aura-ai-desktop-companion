@@ -51,7 +51,8 @@ internal static class VerifiedIndependentProofWriterChecks
             workflow.Contains("execution.ApprovalId != approval.Id.Value"),
             "workflow checks exact bindings and independent proof");
         check(writer.Contains("evidence.IndependentProof is not { } proof") &&
-            writer.Contains("project.UpdatedAt != evidence.IndependentProof.ProjectUpdatedAt") &&
+            writer.Contains("reader.GetDateTime(0) != evidence.IndependentProof!.ProjectUpdatedAt") &&
+            writer.Contains("FOR UPDATE") &&
             writer.Contains("state.Status != DurableExecutionStatus.Succeeded") &&
             writer.Contains("IsolationLevel.RepeatableRead") &&
             !writer.Contains("ExecuteUpdateAsync") && !writer.Contains("Task.Delay"),

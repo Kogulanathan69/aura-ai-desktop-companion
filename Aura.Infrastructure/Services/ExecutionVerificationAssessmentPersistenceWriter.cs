@@ -3,6 +3,7 @@ using Aura.Application.Tools;
 using Aura.Domain.Entities;
 using Aura.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using System.Data;
 
 namespace Aura.Infrastructure.Services;
@@ -83,14 +84,32 @@ public sealed class ExecutionVerificationAssessmentPersistenceWriter(
                     x.Id == evidence.ApprovalId && x.AIActionId == evidence.ActionId.Value &&
                     x.UserId == evidence.Scope.UserId, cancellationToken);
             if (!chain) return false;
-            var project = await db.Projects.AsNoTracking()
-                .Where(x => x.Id == evidence.Scope.ProjectId &&
-                    x.UserId == evidence.Scope.UserId)
-                .Select(x => new { x.Id, x.UpdatedAt })
-                .SingleOrDefaultAsync(cancellationToken);
-            if (project is null || verified &&
-                (project.Id != evidence.IndependentProof!.ProjectId ||
-                 project.UpdatedAt != evidence.IndependentProof.ProjectUpdatedAt))
+            if (verified)
+            {
+                // The row lock conflicts with project UPDATE/DELETE until assessment commit.
+                // Under repeatable-read, a concurrent update before the lock fails closed
+                // with a serialization error; an update after the lock waits for commit.
+                await using var command = db.Database.GetDbConnection().CreateCommand();
+                command.Transaction = transaction.GetDbTransaction();
+                command.CommandText = "SELECT \"UpdatedAt\" FROM \"Projects\" " +
+                    "WHERE \"Id\" = @projectId AND \"UserId\" = @userId FOR UPDATE";
+                var projectId = command.CreateParameter();
+                projectId.ParameterName = "projectId";
+                projectId.Value = evidence.Scope.ProjectId;
+                command.Parameters.Add(projectId);
+                var userId = command.CreateParameter();
+                userId.ParameterName = "userId";
+                userId.Value = evidence.Scope.UserId;
+                command.Parameters.Add(userId);
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                if (!await reader.ReadAsync(cancellationToken) || reader.IsDBNull(0) ||
+                    reader.GetDateTime(0) != evidence.IndependentProof!.ProjectUpdatedAt ||
+                    await reader.ReadAsync(cancellationToken))
+                    return false;
+            }
+            else if (!await db.Projects.AsNoTracking().AnyAsync(x =>
+                x.Id == evidence.Scope.ProjectId && x.UserId == evidence.Scope.UserId,
+                cancellationToken))
                 return false;
 
             db.ExecutionVerificationAssessments.Add(new ExecutionVerificationAssessmentRecord
