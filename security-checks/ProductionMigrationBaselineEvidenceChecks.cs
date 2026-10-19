@@ -159,6 +159,34 @@ internal static class ProductionMigrationBaselineEvidenceChecks
                     "\"AttemptCount\" > 0)", StringComparison.Ordinal) } : x).ToArray()
         }) == ProductionMigrationBaselineEvidence.Stage.IncompatibleConstraint,
             "15B pre-hardening Failed delivery expression cannot pass");
+        check(ProductionMigrationBaselineEvidence.Evaluate(baseline with
+        {
+            Columns = baseline.Columns.Where(x => x.Name != "ExecutionVersion" ||
+                x.Table != "ExecutionVerificationAssessments").ToArray()
+        }) == ProductionMigrationBaselineEvidence.Stage.MissingColumn,
+            "17O missing verification execution-version column fails");
+        check(ProductionMigrationBaselineEvidence.Evaluate(baseline with
+        {
+            Columns = baseline.Columns.Select(x => x.Table == "ExecutionVerificationAssessments" &&
+                x.Name == "ExecutionVersion" ? x with { Required = true } : x).ToArray()
+        }) == ProductionMigrationBaselineEvidence.Stage.IncompatibleColumn,
+            "17O nonnullable historical execution-version column fails");
+        check(ProductionMigrationBaselineEvidence.Evaluate(baseline with
+        {
+            Constraints = baseline.Constraints.Select(x =>
+                x.Name == "CK_ExecutionVerificationAssessments_State"
+                    ? x with { Definition = x.Definition.Replace("\"ExecutionVersion\" = 2",
+                        "\"ExecutionVersion\" = 3", StringComparison.Ordinal) } : x).ToArray()
+        }) == ProductionMigrationBaselineEvidence.Stage.IncompatibleConstraint,
+            "17O wrong terminal execution version fails");
+        check(ProductionMigrationBaselineEvidence.Evaluate(baseline with
+        {
+            Constraints = baseline.Constraints.Select(x =>
+                x.Name == "CK_ExecutionVerificationAssessments_State"
+                    ? x with { Definition = x.Definition.Replace("\"ProofSource\" = 1 AND \"ProofVersion\" = 1",
+                        "\"ProofSource\" = 1 AND \"ProofVersion\" = 0", StringComparison.Ordinal) } : x).ToArray()
+        }) == ProductionMigrationBaselineEvidence.Stage.IncompatibleConstraint,
+            "17O mismatched proof source/version pair fails");
 
         var root = Directory.GetCurrentDirectory();
         var harness = File.ReadAllText(Path.Combine(root, "security-checks",
@@ -167,11 +195,8 @@ internal static class ProductionMigrationBaselineEvidenceChecks
         var api = File.ReadAllText(Path.Combine(root, "Aura.Api", "Program.cs"));
         var files = Directory.GetFiles(Path.Combine(root, "Aura.Infrastructure", "Data", "Migrations"),
             "*.cs").Select(Path.GetFileNameWithoutExtension).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-        check(files.Take(ProductionMigrationBaselineEvidence.ExpectedMigrations.Length)
-                .SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations) &&
-            files.Skip(ProductionMigrationBaselineEvidence.ExpectedMigrations.Length)
-                .SequenceEqual(["20261018000000_AddTrustedVerificationFoundation"]),
-            "15B applied baseline matches first five source IDs; 17N migration remains pending");
+        check(files.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations),
+            "17O six expected migration IDs match exact repository source order");
         check(program.Contains("args[0] == ProductionMigrationBaselineEvidence.Command", StringComparison.Ordinal) &&
             program.IndexOf("await ProductionMigrationBaselineEvidenceChecks.RunAsync(Check)", StringComparison.Ordinal) >
                 program.IndexOf("var checks = 0", StringComparison.Ordinal) &&
@@ -216,7 +241,9 @@ internal static class ProductionMigrationBaselineEvidenceChecks
             constraints.Add(new(table, name, 'c', null, ' ', true,
                 name == "CK_SecurityAuditOutbox_Delivery"
                     ? "CHECK (" + ProductionMigrationBaselineEvidence.HardenedDeliveryExpression + ")"
-                    : "CHECK (" + string.Join(" AND ", markers) + ")"));
+                    : name == "CK_ExecutionVerificationAssessments_State"
+                        ? "CHECK (" + ProductionMigrationBaselineEvidence.VerificationFoundationExpression + ")"
+                        : "CHECK (" + string.Join(" AND ", markers) + ")"));
         var indexes = ProductionMigrationBaselineEvidence.UniqueIndexes.Select(item =>
             new ProductionMigrationBaselineEvidence.Index(item.Table, item.Name, true,
                 "CREATE UNIQUE INDEX " + item.Name + " ON " + item.Table + " (" +
