@@ -80,8 +80,9 @@ internal static class FinalProductionActivationGateChecks
             "20261014000002_AddSecurityPersistenceBundle.cs",
             "20261014000003_AddSecurityAuditOutbox.cs",
             "20261014000004_HardenSecurityAuditOutboxDelivery.cs",
-            "20261018000000_AddTrustedVerificationFoundation.cs" }),
-            "13L original five plus pending 17N migration exist in order; existence is not migration safety");
+            "20261018000000_AddTrustedVerificationFoundation.cs",
+            "20261019000000_AddIndependentVerificationOutcome.cs" }),
+            "17P six baseline sources plus pending Verified constraint source exist in order");
         check(Directory.GetFiles(migrationDirectory, "*ModelSnapshot.cs").Length == 0 &&
             evidenceDocs[5].Contains("historical core schema baseline is still unresolved",
                 StringComparison.OrdinalIgnoreCase),
@@ -126,7 +127,8 @@ internal static class FinalProductionActivationGateChecks
             .SequenceEqual([typeof(DenyToolExecutionPolicy)]),
             "13L deny-only execution policy cannot establish allowing production policy");
         check(productionTypes.Where(type => typeof(IExecutionEvidenceSource).IsAssignableFrom(type))
-            .SequenceEqual([typeof(UnavailableExecutionEvidenceSource)]) &&
+            .ToHashSet().SetEquals([typeof(UnavailableExecutionEvidenceSource),
+                typeof(OwnedProjectMetadataExecutionEvidenceSource)]) &&
             productionTypes.Where(type => typeof(IIndependentVerificationPolicy).IsAssignableFrom(type))
             .SequenceEqual([typeof(ConservativeVerificationPolicy)]),
             "13L execution, audit or AI success cannot become independent verification proof");

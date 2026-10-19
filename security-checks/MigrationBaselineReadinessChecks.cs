@@ -27,12 +27,13 @@ internal static class MigrationBaselineReadinessChecks
             "20261014000002_AddSecurityPersistenceBundle.cs",
             "20261014000003_AddSecurityAuditOutbox.cs",
             "20261014000004_HardenSecurityAuditOutboxDelivery.cs",
-            "20261018000000_AddTrustedVerificationFoundation.cs"
+            "20261018000000_AddTrustedVerificationFoundation.cs",
+            "20261019000000_AddIndependentVerificationOutcome.cs"
         };
 
         check(
             migrationFiles.SequenceEqual(expected),
-            "13J targeted migrations remain ordered before pending 17N source");
+            "17P six baseline migrations remain ordered before pending seventh source");
 
         check(
             string.CompareOrdinal(expected[0], expected[1]) < 0 &&

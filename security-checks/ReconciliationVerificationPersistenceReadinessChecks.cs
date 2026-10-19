@@ -48,7 +48,8 @@ internal static class ReconciliationVerificationPersistenceReadinessChecks
                 .ToHashSet().SetEquals([typeof(UnavailableExecutionReconciliationSource),
                     typeof(ExecutionReconciliationPersistenceSource)]) &&
             implementations.Where(type => typeof(IExecutionEvidenceSource).IsAssignableFrom(type))
-                .SequenceEqual([typeof(UnavailableExecutionEvidenceSource)]) &&
+                .ToHashSet().SetEquals([typeof(UnavailableExecutionEvidenceSource),
+                    typeof(OwnedProjectMetadataExecutionEvidenceSource)]) &&
             implementations.Where(type => typeof(IIndependentVerificationPolicy).IsAssignableFrom(type))
                 .SequenceEqual([typeof(ConservativeVerificationPolicy)]),
             "13E unregistered reconciliation reader exists; trusted verification and proof remain unavailable");

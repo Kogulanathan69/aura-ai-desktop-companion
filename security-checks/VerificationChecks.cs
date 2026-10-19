@@ -9,12 +9,13 @@ using Aura.Application.ProjectFiles.Content;
 using Aura.Application.AI.Chat.DTOs;
 using Aura.Application.AI.Chat.Services;
 using Aura.Application.AI.Providers;
+using Aura.Domain.Entities;
 
 internal static class VerificationChecks
 {
     public static async Task RunAsync(Action<bool, string> check)
     {
-        ToolIdentifier.TryCreate("fixture", out var toolId);
+        ToolIdentifier.TryCreate("owned-project-metadata-read", out var toolId);
         ToolIdentifier.TryCreate("other", out var otherTool);
         var handler = new NeverCalledHandler();
         var tools = new ToolRegistry([new(new(toolId!, "Fixture", "Synthetic fixture", ToolCapability.ProjectRead,
@@ -31,7 +32,12 @@ internal static class VerificationChecks
         var request = new VerificationRequest(Guid.NewGuid());
         // Synthetic bounded adapter data, not a ToolExecution/entity or fabricated executing action.
         var input = new ExecutionEvidenceInput(request.ExecutionId, action.Id, scope, toolId!, approval.Id.Value,
-            ExecutionReportOutcome.Succeeded, clock.UtcNow);
+            ExecutionReportOutcome.Succeeded, clock.UtcNow)
+        {
+            ExecutionVersion = 2,
+            ProjectObservation = new(scope.ProjectId, clock.UtcNow,
+                VerificationProofSource.OwnedProjectMetadata, 1)
+        };
         var source = new SourceFixture { Input = input };
         var proof = new ProofFixture();
         var workflow = new VerificationWorkflowService(tools, owner, source, proof, clock);
@@ -60,8 +66,9 @@ internal static class VerificationChecks
         check(typeof(VerificationRequest).GetProperties().Select(x => x.Name).SequenceEqual(new[] { "ExecutionId" }),
             "11Q request excludes outcomes, proof, IDs/timestamps/scope/text/payload selectors");
         check(typeof(ExecutionEvidenceInput).GetProperties().Select(x => x.Name).SequenceEqual(
-            new[] { "ExecutionId", "ActionId", "Scope", "ToolId", "ApprovalId", "Outcome", "CompletedAt" }),
-            "11Q execution adapter DTO has only fixed fields, no logs/contents/commands/secrets/JSON/facts");
+            new[] { "ExecutionId", "ActionId", "Scope", "ToolId", "ApprovalId", "Outcome", "CompletedAt",
+                "ExecutionVersion", "ProjectObservation" }),
+            "17P execution adapter DTO adds only bounded version and project observation");
         foreach (var foreign in new[] { scope with { UserId = Guid.NewGuid() }, scope with { ConversationId = Guid.NewGuid() },
             scope with { ProjectId = Guid.NewGuid() } })
         {
@@ -110,6 +117,20 @@ internal static class VerificationChecks
             source.Input = bad;
             check((await workflow.VerifyAsync(scope, action, approval, request)).Status == VerificationOperationStatus.EvidenceDenied,
                 "11Q malformed/mismatched/untrusted execution adapter input fails closed");
+        }
+        foreach (var bad in new[]
+        {
+            input with { ExecutionVersion = 1 },
+            input with { ProjectObservation = null },
+            input with { ProjectObservation = input.ProjectObservation! with { ProjectId = Guid.NewGuid() } },
+            input with { ProjectObservation = input.ProjectObservation! with { ProofSource = VerificationProofSource.None } },
+            input with { ProjectObservation = input.ProjectObservation! with { ProofVersion = 0 } }
+        })
+        {
+            source.Input = bad;
+            check((await workflow.VerifyAsync(scope, action, approval, request)).Status ==
+                VerificationOperationStatus.EvidenceDenied,
+                "17P missing, foreign, wrong-source or stale-version proof cannot become Verified");
         }
         source.Input = null;
         check((await workflow.VerifyAsync(scope, action, approval, request)).Status == VerificationOperationStatus.ExecutionUnavailable,

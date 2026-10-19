@@ -113,8 +113,9 @@ internal static class FinalProductionReadinessChecks
                     typeof(ExecutionReconciliationPersistenceSource)]),
             "13E unregistered reconciliation source does not make production runtime ready");
         check(productionTypes.Where(type => typeof(IExecutionEvidenceSource).IsAssignableFrom(type))
-                .SequenceEqual([typeof(UnavailableExecutionEvidenceSource)]),
-            "12L no production verification evidence source exists");
+                .ToHashSet().SetEquals([typeof(UnavailableExecutionEvidenceSource),
+                    typeof(OwnedProjectMetadataExecutionEvidenceSource)]),
+            "17P source exists but production verification remains unregistered");
         check(productionTypes.Where(type => typeof(IIndependentVerificationPolicy).IsAssignableFrom(type))
                 .SequenceEqual([typeof(ConservativeVerificationPolicy)]),
             "12L no independent production proof policy exists");
