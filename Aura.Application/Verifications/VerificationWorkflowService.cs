@@ -52,7 +52,13 @@ public sealed class VerificationWorkflowService(ToolRegistry tools, IVerificatio
                  proof.ProjectId != scope.ProjectId || proof.UpdatedAt.Kind != DateTimeKind.Utc ||
                  proof.UpdatedAt == default ||
                  proof.ProofSource != VerificationProofSource.OwnedProjectMetadata ||
-                 proof.ProofVersion != 1)))
+                 proof.ProofVersion != 1 ||
+                 execution.IndependentProof is not { } independent ||
+                 independent.ProjectId != proof.ProjectId ||
+                 independent.ProjectUpdatedAt != proof.UpdatedAt ||
+                 independent.ExecutionVersion != execution.ExecutionVersion ||
+                 independent.ProofSource != VerificationProofSource.OwnedProjectMetadata ||
+                 independent.ProofVersion != 1)))
                 return VerificationOperationResult.Denied(VerificationOperationStatus.EvidenceDenied);
             owned = await scopes.ValidateAsync(scope, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();

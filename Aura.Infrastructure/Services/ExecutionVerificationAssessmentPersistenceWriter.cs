@@ -3,11 +3,12 @@ using Aura.Application.Tools;
 using Aura.Domain.Entities;
 using Aura.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace Aura.Infrastructure.Services;
 
-// Unregistered until the pending migration and independent proof path are reviewed.
-// Repeated advisory assessments have distinct IDs; durable execution is never changed.
+// Unregistered pending live Verified persistence and full composition review.
+// Every assessment is an immutable historical row with a distinct ID.
 public sealed class ExecutionVerificationAssessmentPersistenceWriter(
     IDbContextFactory<AuraDbContext> factory) : IExecutionVerificationAssessmentWriter
 {
@@ -22,13 +23,31 @@ public sealed class ExecutionVerificationAssessmentPersistenceWriter(
             evidence.ToolId is null ||
             !ToolIdentifier.TryCreate(evidence.ToolId.Value, out var canonical) ||
             canonical != evidence.ToolId || executionVersion != 2 ||
-            evidence.Outcome is not (VerificationOutcome.Failed or VerificationOutcome.Inconclusive) ||
+            evidence.ExecutionVersion != executionVersion ||
+            !Enum.IsDefined(evidence.Outcome) ||
             evidence.IssuedAt.Kind != DateTimeKind.Utc || evidence.IssuedAt == default)
+            return false;
+
+        var verified = evidence.Outcome == VerificationOutcome.Verified;
+        if (verified && (evidence.ExecutionReport != ExecutionReportOutcome.Succeeded ||
+            evidence.ToolId.Value != "owned-project-metadata-read" ||
+            evidence.IndependentProof is not { } proof ||
+            proof.ProjectId != evidence.Scope.ProjectId ||
+            proof.ExecutionVersion != executionVersion ||
+            proof.ProofSource != VerificationProofSource.OwnedProjectMetadata ||
+            proof.ProofVersion != 1 ||
+            proof.ProjectUpdatedAt == default ||
+            proof.ProjectUpdatedAt.Kind != DateTimeKind.Utc))
+            return false;
+        if (!verified && evidence.Outcome is not
+            (VerificationOutcome.Failed or VerificationOutcome.Inconclusive))
             return false;
 
         try
         {
             await using var db = await factory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.RepeatableRead, cancellationToken);
             var state = await db.ActionExecutionStates.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.ActionId == evidence.ActionId.Value &&
                     x.UserId == evidence.Scope.UserId &&
@@ -41,13 +60,16 @@ public sealed class ExecutionVerificationAssessmentPersistenceWriter(
                     (x.Status == DurableExecutionStatus.Succeeded ||
                      x.Status == DurableExecutionStatus.Failed), cancellationToken);
             if (state?.CompletedAt is not DateTime completedAt ||
-                completedAt.Kind != DateTimeKind.Utc || evidence.IssuedAt < completedAt)
+                completedAt.Kind != DateTimeKind.Utc || evidence.IssuedAt < completedAt ||
+                state.Status == DurableExecutionStatus.Succeeded &&
+                    evidence.ExecutionReport != ExecutionReportOutcome.Succeeded ||
+                state.Status == DurableExecutionStatus.Failed &&
+                    evidence.ExecutionReport != ExecutionReportOutcome.Failed ||
+                verified && state.Status != DurableExecutionStatus.Succeeded ||
+                verified && evidence.IndependentProof!.ProjectUpdatedAt > evidence.IssuedAt)
                 return false;
             var chain = await db.Users.AsNoTracking().AnyAsync(x =>
                     x.Id == evidence.Scope.UserId && x.IsActive, cancellationToken) &&
-                await db.Projects.AsNoTracking().AnyAsync(x =>
-                    x.Id == evidence.Scope.ProjectId && x.UserId == evidence.Scope.UserId,
-                    cancellationToken) &&
                 await db.Conversations.AsNoTracking().AnyAsync(x =>
                     x.Id == evidence.Scope.ConversationId &&
                     x.UserId == evidence.Scope.UserId &&
@@ -61,6 +83,15 @@ public sealed class ExecutionVerificationAssessmentPersistenceWriter(
                     x.Id == evidence.ApprovalId && x.AIActionId == evidence.ActionId.Value &&
                     x.UserId == evidence.Scope.UserId, cancellationToken);
             if (!chain) return false;
+            var project = await db.Projects.AsNoTracking()
+                .Where(x => x.Id == evidence.Scope.ProjectId &&
+                    x.UserId == evidence.Scope.UserId)
+                .Select(x => new { x.Id, x.UpdatedAt })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (project is null || verified &&
+                (project.Id != evidence.IndependentProof!.ProjectId ||
+                 project.UpdatedAt != evidence.IndependentProof.ProjectUpdatedAt))
+                return false;
 
             db.ExecutionVerificationAssessments.Add(new ExecutionVerificationAssessmentRecord
             {
@@ -69,12 +100,15 @@ public sealed class ExecutionVerificationAssessmentPersistenceWriter(
                 ProjectId = evidence.Scope.ProjectId, ToolId = evidence.ToolId.Value,
                 ApprovalId = evidence.ApprovalId, ExecutionId = evidence.ExecutionId,
                 ExecutionVersion = executionVersion, ExecutionStatus = state.Status,
-                Outcome = (int)evidence.Outcome, ProofSource = VerificationProofSource.None,
-                ProofVersion = 0, AssessedAt = evidence.IssuedAt
+                Outcome = (int)evidence.Outcome,
+                ProofSource = verified ? VerificationProofSource.OwnedProjectMetadata : VerificationProofSource.None,
+                ProofVersion = verified ? 1 : 0, AssessedAt = evidence.IssuedAt
             });
             var saved = await db.SaveChangesAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            return saved == 1;
+            if (saved != 1) return false;
+            await transaction.CommitAsync(cancellationToken);
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception) { return false; }

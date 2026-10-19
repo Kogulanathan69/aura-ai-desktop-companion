@@ -46,6 +46,13 @@ if (args.Length == 1 && args[0] == LiveIndependentVerificationOutcomeMigrationAp
     return;
 }
 
+if (args.Length == 1 && args[0] == LiveIndependentVerificationEvidence.Command)
+{
+    Environment.ExitCode = await LiveIndependentVerificationEvidence.RunAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 if (args.Length == 1 && args[0] == LivePermissionVerification.Command)
 {
     Environment.ExitCode = await LivePermissionVerification.RunAsync(
@@ -146,6 +153,7 @@ await ToolChecks.RunAsync(Check);
 await ActionChecks.RunAsync(Check);
 await ApprovalChecks.RunAsync(Check);
 await VerificationChecks.RunAsync(Check);
+await VerifiedIndependentProofWriterChecks.RunAsync(Check);
 await ExecutionChecks.RunAsync(Check);
 
 

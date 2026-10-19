@@ -36,7 +36,9 @@ internal static class VerificationChecks
         {
             ExecutionVersion = 2,
             ProjectObservation = new(scope.ProjectId, clock.UtcNow,
-                VerificationProofSource.OwnedProjectMetadata, 1)
+                VerificationProofSource.OwnedProjectMetadata, 1),
+            IndependentProof = OwnedProjectMetadataProof.FromAuthoritativeRead(
+                scope.ProjectId, clock.UtcNow, 2)
         };
         var source = new SourceFixture { Input = input };
         var proof = new ProofFixture();
@@ -67,7 +69,7 @@ internal static class VerificationChecks
             "11Q request excludes outcomes, proof, IDs/timestamps/scope/text/payload selectors");
         check(typeof(ExecutionEvidenceInput).GetProperties().Select(x => x.Name).SequenceEqual(
             new[] { "ExecutionId", "ActionId", "Scope", "ToolId", "ApprovalId", "Outcome", "CompletedAt",
-                "ExecutionVersion", "ProjectObservation" }),
+                "ExecutionVersion", "ProjectObservation", "IndependentProof" }),
             "17P execution adapter DTO adds only bounded version and project observation");
         foreach (var foreign in new[] { scope with { UserId = Guid.NewGuid() }, scope with { ConversationId = Guid.NewGuid() },
             scope with { ProjectId = Guid.NewGuid() } })
@@ -121,6 +123,7 @@ internal static class VerificationChecks
         foreach (var bad in new[]
         {
             input with { ExecutionVersion = 1 },
+            input with { IndependentProof = null },
             input with { ProjectObservation = null },
             input with { ProjectObservation = input.ProjectObservation! with { ProjectId = Guid.NewGuid() } },
             input with { ProjectObservation = input.ProjectObservation! with { ProofSource = VerificationProofSource.None } },

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Aura.Infrastructure.Services;
 
-// Unregistered until the full verification graph and Verified schema are reviewed.
+// Unregistered pending live Verified persistence and full composition review.
 // Reads one exact durable execution and its authoritative owned project in one snapshot.
 public sealed class OwnedProjectMetadataExecutionEvidenceSource(
     IDbContextFactory<AuraDbContext> factory) : IExecutionEvidenceSource
@@ -65,6 +65,7 @@ public sealed class OwnedProjectMetadataExecutionEvidenceSource(
             // The project query re-observes the approved scope from the database.
             // A failed execution retains a failure report, never project proof.
             OwnedProjectMetadataObservation? observation = null;
+            OwnedProjectMetadataProof? independentProof = null;
             if (state.Status == DurableExecutionStatus.Succeeded)
             {
                 var project = await db.Projects.AsNoTracking()
@@ -76,6 +77,9 @@ public sealed class OwnedProjectMetadataExecutionEvidenceSource(
                     return null;
                 observation = new(project.Id, project.UpdatedAt,
                     VerificationProofSource.OwnedProjectMetadata, 1);
+                independentProof = OwnedProjectMetadataProof.FromAuthoritativeRead(
+                    project.Id, project.UpdatedAt, state.Version);
+                if (independentProof is null) return null;
             }
             await transaction.CommitAsync(cancellationToken);
             return new ExecutionEvidenceInput(executionId, actionId, scope, tool!,
@@ -85,7 +89,8 @@ public sealed class OwnedProjectMetadataExecutionEvidenceSource(
                 completedAt)
             {
                 ExecutionVersion = state.Version,
-                ProjectObservation = observation
+                ProjectObservation = observation,
+                IndependentProof = independentProof
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
