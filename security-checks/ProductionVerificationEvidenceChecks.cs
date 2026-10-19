@@ -120,17 +120,17 @@ internal static class ProductionVerificationEvidenceChecks
             .Concat(typeof(IExecutionEvidenceSource).Assembly.GetTypes())
             .Where(type => type.IsClass && !type.IsAbstract &&
                 typeof(IExecutionEvidenceSource).IsAssignableFrom(type)).ToArray();
-        check(adapters.SequenceEqual([typeof(UnavailableExecutionEvidenceSource)]) &&
+        check(adapters.ToHashSet().SetEquals([typeof(UnavailableExecutionEvidenceSource),
+                typeof(Aura.Infrastructure.Services.OwnedProjectMetadataExecutionEvidenceSource)]) &&
             !api.Contains("AddScoped<IExecutionEvidenceSource", StringComparison.Ordinal) &&
             inspector.Contains("ReviewedVerification = new HashSet<Type>()") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Verification &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().Verification &&
             !new RuntimeSafetyOptions().ProductionAdaptersEnabled &&
             !new RuntimeSafetyOptions().ToolExecutionEnabled,
-            "15G no independent production adapter, registration or readiness claim exists");
-        check(!contracts.Contains("long Version", StringComparison.Ordinal) &&
-            !typeof(ExecutionEvidenceInput).GetProperties().Any(x => x.Name is
-                "ProofSource" or "ProofVersion" or "ExecutionVersion") &&
+            "17P independent source is unregistered and cannot claim readiness");
+        check(typeof(ExecutionEvidenceInput).GetProperties().Any(x => x.Name == "ExecutionVersion") &&
+            typeof(ExecutionEvidenceInput).GetProperties().Any(x => x.Name == "ProjectObservation") &&
             typeof(ExecutionVerificationAssessmentRecord).GetProperties().Any(x =>
                 x.Name == "ExecutionVersion"),
             "15G historical evidence contract still lacks a live adapter despite pending version field");

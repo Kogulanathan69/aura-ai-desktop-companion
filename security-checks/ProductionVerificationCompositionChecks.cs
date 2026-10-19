@@ -56,9 +56,10 @@ internal static class ProductionVerificationCompositionChecks
             .Concat(typeof(IExecutionEvidenceSource).Assembly.GetTypes())
             .Where(type => type.IsClass && !type.IsAbstract &&
                 typeof(IExecutionEvidenceSource).IsAssignableFrom(type)).ToArray();
-        check(productionTypes.SequenceEqual([typeof(UnavailableExecutionEvidenceSource)]) &&
+        check(productionTypes.ToHashSet().SetEquals([typeof(UnavailableExecutionEvidenceSource),
+                typeof(OwnedProjectMetadataExecutionEvidenceSource)]) &&
             !Ready(unavailable),
-            "14L production assemblies have no independent evidence adapter");
+            "17P source presence does not establish reviewed verification composition");
 
         var root = Directory.GetCurrentDirectory();
         string Read(params string[] parts) => File.ReadAllText(Path.Combine([root, .. parts]));

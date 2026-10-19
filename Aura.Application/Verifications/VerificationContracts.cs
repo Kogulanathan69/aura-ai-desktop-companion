@@ -1,6 +1,7 @@
 using Aura.Application.Actions;
 using Aura.Application.Approvals;
 using Aura.Application.Tools;
+using Aura.Domain.Entities;
 
 namespace Aura.Application.Verifications;
 
@@ -18,7 +19,17 @@ public enum VerificationOutcome { Verified, Failed, Inconclusive }
 // never from a public request. No logs, contents, commands, arbitrary facts or JSON.
 public sealed record ExecutionEvidenceInput(Guid ExecutionId, ActionIdentifier ActionId,
     ActionScope Scope, ToolIdentifier ToolId, Guid ApprovalId, ExecutionReportOutcome Outcome,
-    DateTime CompletedAt);
+    DateTime CompletedAt)
+{
+    // Source-owned observation; never derived from a handler result or public request.
+    public long? ExecutionVersion { get; init; }
+    public OwnedProjectMetadataObservation? ProjectObservation { get; init; }
+}
+
+// Project identity and one already persisted, bounded timestamp. No path, description,
+// repository URL, file content, metadata dictionary or handler response.
+public sealed record OwnedProjectMetadataObservation(Guid ProjectId, DateTime UpdatedAt,
+    VerificationProofSource ProofSource, int ProofVersion);
 
 public interface IExecutionEvidenceSource
 {
@@ -28,6 +39,12 @@ public interface IExecutionEvidenceSource
     // and current evidence provenance. Return null for unavailable/untrusted execution.
     // Must scope before reading, never execute a tool to manufacture evidence.
     Task<ExecutionEvidenceInput?> GetAsync(ActionScope scope, Guid executionId, CancellationToken cancellationToken);
+
+    // Exact action identity is supplied by the already validated workflow. Older
+    // unavailable/test sources remain conservative through the default method.
+    Task<ExecutionEvidenceInput?> GetAsync(ActionScope scope, ActionIdentifier actionId,
+        Guid executionId, CancellationToken cancellationToken) =>
+        GetAsync(scope, executionId, cancellationToken);
 }
 
 public sealed class UnavailableExecutionEvidenceSource : IExecutionEvidenceSource

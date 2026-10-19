@@ -19,10 +19,11 @@ internal static class ProductionExecutionRemainingBlockerChecks
             .Concat(typeof(IExecutionEvidenceSource).Assembly.GetTypes())
             .Where(t => t.IsClass && !t.IsAbstract && typeof(IExecutionEvidenceSource).IsAssignableFrom(t))
             .ToArray();
-        check(production.SequenceEqual([typeof(UnavailableExecutionEvidenceSource)]) &&
+        check(production.ToHashSet().SetEquals([typeof(UnavailableExecutionEvidenceSource),
+                typeof(Aura.Infrastructure.Services.OwnedProjectMetadataExecutionEvidenceSource)]) &&
             contracts.Contains("Proof", StringComparison.OrdinalIgnoreCase) &&
             !contracts.Contains("ProofVersion { get; }") &&
-            workflow.Contains("executions.GetAsync(scope, request.ExecutionId, cancellationToken)") &&
+            workflow.Contains("executions.GetAsync(scope, action.Id, request.ExecutionId, cancellationToken)") &&
             !workflow.Contains("SaveChangesAsync") &&
             !api.Contains("AddScoped<IExecutionEvidenceSource") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Verification,

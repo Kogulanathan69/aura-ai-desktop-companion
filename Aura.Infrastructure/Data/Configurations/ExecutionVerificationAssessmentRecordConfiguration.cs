@@ -21,10 +21,12 @@ public sealed class ExecutionVerificationAssessmentRecordConfiguration : IEntity
             table.HasCheckConstraint("CK_ExecutionVerificationAssessments_ToolId",
                 "\"ToolId\" ~ '^[a-z][a-z0-9-]{0,63}$'");
             table.HasCheckConstraint("CK_ExecutionVerificationAssessments_State",
-                "\"ExecutionStatus\" IN (2, 3) AND \"Outcome\" IN (1, 2) AND " +
+                "(\"ExecutionStatus\" IN (2, 3) AND \"Outcome\" IN (1, 2) AND " +
                 "((\"ExecutionVersion\" IS NULL AND \"ProofSource\" = 0 AND \"ProofVersion\" = 0) OR " +
                 "(\"ExecutionVersion\" = 2 AND ((\"ProofSource\" = 0 AND \"ProofVersion\" = 0) OR " +
-                "(\"ProofSource\" = 1 AND \"ProofVersion\" = 1))))");
+                "(\"ProofSource\" = 1 AND \"ProofVersion\" = 1))))) OR " +
+                "(\"ExecutionStatus\" = 2 AND \"Outcome\" = 0 AND \"ExecutionVersion\" = 2 AND " +
+                "\"ProofSource\" = 1 AND \"ProofVersion\" = 1)");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.ToolId).HasMaxLength(64).IsRequired();

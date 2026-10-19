@@ -195,8 +195,9 @@ internal static class ProductionMigrationBaselineEvidenceChecks
         var api = File.ReadAllText(Path.Combine(root, "Aura.Api", "Program.cs"));
         var files = Directory.GetFiles(Path.Combine(root, "Aura.Infrastructure", "Data", "Migrations"),
             "*.cs").Select(Path.GetFileNameWithoutExtension).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-        check(files.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations),
-            "17O six expected migration IDs match exact repository source order");
+        check(files.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations.Concat(
+                ["20261019000000_AddIndependentVerificationOutcome"])),
+            "17P six applied baseline IDs and one pending source match exact repository order");
         check(program.Contains("args[0] == ProductionMigrationBaselineEvidence.Command", StringComparison.Ordinal) &&
             program.IndexOf("await ProductionMigrationBaselineEvidenceChecks.RunAsync(Check)", StringComparison.Ordinal) >
                 program.IndexOf("var checks = 0", StringComparison.Ordinal) &&

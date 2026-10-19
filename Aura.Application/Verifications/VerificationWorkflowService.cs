@@ -3,6 +3,7 @@ using Aura.Application.Approvals;
 using Aura.Application.Common.Interfaces;
 using Aura.Application.Tools;
 using Aura.Application.Auditing;
+using Aura.Domain.Entities;
 
 namespace Aura.Application.Verifications;
 
@@ -33,7 +34,7 @@ public sealed class VerificationWorkflowService(ToolRegistry tools, IVerificatio
                 return VerificationOperationResult.Denied(VerificationOperationStatus.UnknownTool);
             if (tool.Id != action.ToolId || tool.Enabled)
                 return VerificationOperationResult.Denied(VerificationOperationStatus.EvidenceDenied);
-            var execution = await executions.GetAsync(scope, request.ExecutionId, cancellationToken);
+            var execution = await executions.GetAsync(scope, action.Id, request.ExecutionId, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (execution is null) return VerificationOperationResult.Denied(VerificationOperationStatus.ExecutionUnavailable);
             if (execution.ExecutionId != request.ExecutionId || execution.ActionId != action.Id || execution.Scope != scope ||
@@ -43,7 +44,15 @@ public sealed class VerificationWorkflowService(ToolRegistry tools, IVerificatio
             var outcome = await policy.EvaluateAsync(execution, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             // Failure/unknown reports cannot be promoted to Verified even by a faulty proof policy.
-            if (!Enum.IsDefined(outcome) || (outcome == VerificationOutcome.Verified && execution.Outcome != ExecutionReportOutcome.Succeeded))
+            if (!Enum.IsDefined(outcome) || (outcome == VerificationOutcome.Verified &&
+                (execution.Outcome != ExecutionReportOutcome.Succeeded ||
+                 execution.ExecutionVersion != 2 ||
+                 execution.ToolId.Value != "owned-project-metadata-read" ||
+                 execution.ProjectObservation is not { } proof ||
+                 proof.ProjectId != scope.ProjectId || proof.UpdatedAt.Kind != DateTimeKind.Utc ||
+                 proof.UpdatedAt == default ||
+                 proof.ProofSource != VerificationProofSource.OwnedProjectMetadata ||
+                 proof.ProofVersion != 1)))
                 return VerificationOperationResult.Denied(VerificationOperationStatus.EvidenceDenied);
             owned = await scopes.ValidateAsync(scope, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();

@@ -13,7 +13,7 @@ internal static class AuditWorkflowChecks
 {
     public static async Task RunAsync(Action<bool, string> check)
     {
-        ToolIdentifier.TryCreate("audit-fixture", out var toolId);
+        ToolIdentifier.TryCreate("owned-project-metadata-read", out var toolId);
         var tool = new ToolDescriptor(toolId!, "Fixture", "Synthetic fixture",
             ToolCapability.ProjectRead, ToolPermissionRequirement.OwnedProjectRead);
         var handler = new Handler();
@@ -209,7 +209,12 @@ internal static class AuditWorkflowChecks
 
         var verificationSource = new VerificationSource(new ExecutionEvidenceInput(
             Guid.NewGuid(), approved.Id, scope, tool.Id, approval.Id.Value,
-            ExecutionReportOutcome.Succeeded, clock.UtcNow));
+            ExecutionReportOutcome.Succeeded, clock.UtcNow)
+        {
+            ExecutionVersion = 2,
+            ProjectObservation = new(scope.ProjectId, clock.UtcNow,
+                Aura.Domain.Entities.VerificationProofSource.OwnedProjectMetadata, 1)
+        });
         var proof = new Proof();
         foreach (var (verificationOutcome, auditOutcome) in new[]
         {
