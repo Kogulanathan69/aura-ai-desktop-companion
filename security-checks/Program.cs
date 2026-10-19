@@ -32,6 +32,13 @@ if (args.Length == 1 && args[0] == ProductionMigrationBaselineEvidence.Command)
     return;
 }
 
+if (args.Length == 1 && args[0] == LiveVerificationMigrationApplication.Command)
+{
+    Environment.ExitCode = await LiveVerificationMigrationApplication.RunAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 if (args.Length == 1 && args[0] == LivePermissionVerification.Command)
 {
     Environment.ExitCode = await LivePermissionVerification.RunAsync(
@@ -152,6 +159,7 @@ await LiveOwnershipVerificationChecks.RunAsync(Check);
 await ProductionOwnershipEvidenceChecks.RunAsync(Check);
 await ProductionMigrationBaselineEvidenceChecks.RunAsync(Check);
 await SameTargetMigrationBaselineChecks.RunAsync(Check);
+await VerificationMigrationBaselineRefreshChecks.RunAsync(Check);
 await DbBackedProductionRegistrationChecks.RunAsync(Check);
 await FirstSafeProductionToolChecks.RunAsync(Check);
 await TrustedTargetVerificationFoundationChecks.RunAsync(Check);

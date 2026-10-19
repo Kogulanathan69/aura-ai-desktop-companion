@@ -16,12 +16,18 @@ internal static class ProductionMigrationBaselineEvidence
         "20261014000001_AddActionExecutionStates",
         "20261014000002_AddSecurityPersistenceBundle",
         "20261014000003_AddSecurityAuditOutbox",
-        "20261014000004_HardenSecurityAuditOutboxDelivery"
+        "20261014000004_HardenSecurityAuditOutboxDelivery",
+        "20261018000000_AddTrustedVerificationFoundation"
     ];
     internal const string HardenedDeliveryExpression =
         "(\"DeliveryState\" = 0 AND \"AttemptCount\" = 0 AND \"DeliveredAt\" IS NULL) OR " +
         "(\"DeliveryState\" = 1 AND \"AttemptCount\" > 0 AND \"DeliveredAt\" IS NOT NULL) OR " +
         "(\"DeliveryState\" = 2 AND \"AttemptCount\" > 0 AND \"DeliveredAt\" IS NULL)";
+    internal const string VerificationFoundationExpression =
+        "\"ExecutionStatus\" IN (2, 3) AND \"Outcome\" IN (1, 2) AND " +
+        "((\"ExecutionVersion\" IS NULL AND \"ProofSource\" = 0 AND \"ProofVersion\" = 0) OR " +
+        "(\"ExecutionVersion\" = 2 AND ((\"ProofSource\" = 0 AND \"ProofVersion\" = 0) OR " +
+        "(\"ProofSource\" = 1 AND \"ProofVersion\" = 1))))";
 
     internal enum Stage
     {
@@ -236,6 +242,15 @@ internal static class ProductionMigrationBaselineEvidence
                 CanonicalExpression(actual.Definition) !=
                 CanonicalExpression("CHECK " + HardenedDeliveryExpression))
                 return Stage.IncompatibleConstraint;
+            if (name == "CK_ExecutionVerificationAssessments_State" &&
+                (!definition.Contains("executionversionisnullandproofsource=0andproofversion=0",
+                    StringComparison.Ordinal) ||
+                 !definition.Contains("executionversion=2andproofsource=0andproofversion=0",
+                    StringComparison.Ordinal) ||
+                 !definition.Contains("proofsource=1andproofversion=1",
+                    StringComparison.Ordinal) ||
+                 definition.Contains("outcome=0", StringComparison.Ordinal)))
+                return Stage.IncompatibleConstraint;
         }
         return Stage.Passed;
     }
@@ -349,6 +364,7 @@ internal static class ProductionMigrationBaselineEvidence
         new("ExecutionVerificationAssessments", "ToolId", "varchar", true, 64),
         new("ExecutionVerificationAssessments", "ApprovalId", "uuid", true),
         new("ExecutionVerificationAssessments", "ExecutionId", "uuid", true),
+        new("ExecutionVerificationAssessments", "ExecutionVersion", "int8", false),
         new("ExecutionVerificationAssessments", "ExecutionStatus", "int4", true),
         new("ExecutionVerificationAssessments", "Outcome", "int4", true),
         new("ExecutionVerificationAssessments", "ProofSource", "int4", true),
@@ -430,6 +446,6 @@ internal static class ProductionMigrationBaselineEvidence
         ("ExecutionReconciliationAssessments", "CK_ExecutionReconciliationAssessments_State", ["observedstatus=1", "observedversion=1", "reason", "disposition", "0", "5"]),
         ("ExecutionVerificationAssessments", "CK_ExecutionVerificationAssessments_Ids", ["actionid", "approvalid"]),
         ("ExecutionVerificationAssessments", "CK_ExecutionVerificationAssessments_ToolId", ["toolid"]),
-        ("ExecutionVerificationAssessments", "CK_ExecutionVerificationAssessments_State", ["executionstatus", "outcome", "proofsource=0", "proofversion=0", "2", "3"])
+        ("ExecutionVerificationAssessments", "CK_ExecutionVerificationAssessments_State", ["executionstatus", "outcome", "executionversionisnull", "executionversion=2", "proofsource=0", "proofversion=0", "proofsource=1", "proofversion=1", "2", "3"])
     ];
 }
