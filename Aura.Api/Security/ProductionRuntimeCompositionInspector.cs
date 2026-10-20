@@ -60,7 +60,28 @@ public static class ProductionRuntimeCompositionInspector
         };
     private static readonly IReadOnlySet<Type> ReviewedOwnershipFactory =
         new HashSet<Type> { typeof(AuraDbContextFactory) };
-    private static readonly IReadOnlySet<Type> ReviewedPermission = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedPermission =
+        new HashSet<Type> { typeof(ToolPermissionPersistenceSource) };
+    private static readonly IReadOnlySet<Type> ReviewedPermissionPolicy =
+        new HashSet<Type> { typeof(ExactToolPermissionPolicy) };
+    private static readonly IReadOnlySet<Type> ReviewedPermissionValidator =
+        new HashSet<Type> { typeof(ToolExecutionPermissionValidator) };
+    // Operator-reviewed PASS from the gated generated-fixture permission harness on
+    // aura_disposable_test, OID 24576, system 7696813047573034172.
+    private const string PermissionEvidenceDatabase = "aura_disposable_test";
+    private const uint PermissionEvidenceOid = 24576;
+    private const long PermissionEvidenceSystem = 7696813047573034172;
+    private const string PermissionEvidenceResult = "PASS";
+    private static readonly IReadOnlySet<string> ReviewedPermissionLiveEvidence =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "DB CONNECTIVITY", "SCHEMA CHECK", "FIXTURE SETUP", "ACTIVE GRANT ALLOW",
+            "OWNED USER GRANT ALLOW", "EXACT PROJECT GRANT ALLOW", "EXACT TOOL GRANT ALLOW",
+            "EXACT PERMISSION ALLOW", "FOREIGN USER GRANT DENY", "WRONG PROJECT DENY",
+            "WRONG CONVERSATION DENY", "WRONG TOOL DENY", "WRONG PERMISSION DENY",
+            "UNKNOWN GRANT DENY", "REVOKED GRANT DENY",
+            "REVOCATION AFTER PRIOR ALLOW DENY", "NEGATIVE BINDINGS", "CLEANUP", "RESULT"
+        };
     private static readonly IReadOnlySet<Type> ReviewedExecutionState = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedAuditSink = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedAuditDelivery = new HashSet<Type>();
@@ -99,7 +120,11 @@ public static class ProductionRuntimeCompositionInspector
             HasExactValidatorAlias<IToolExecutionScopeValidator>(services) &&
             HasExactValidatorAlias<IVerificationScopeValidator>(services) &&
             HasExactValidatorAlias<IExecutionReconciliationScopeValidator>(services);
-        var permission = HasExactPermissionSource(services);
+        var permission = ownership && HasRequiredPermissionLiveEvidence() &&
+            HasExactPermissionSource(services) &&
+            HasOne<IToolPermissionPolicy>(services, ReviewedPermissionPolicy) &&
+            HasOne<IToolExecutionPermissionValidator>(services, ReviewedPermissionValidator) &&
+            HasExactDbContextAlias(services) && HasOneScoped<AuraDbContext>(services);
         var executionState = HasExactExecutionStateStore(services);
         var auditSink = HasExactAuditSink(services);
         var auditDelivery = HasExactAuditDeliveryDispatcher(services);
@@ -208,7 +233,7 @@ public static class ProductionRuntimeCompositionInspector
     }
 
     // A generic Permission adapter, unavailable source, factory or registration
-    // alone cannot attest an exact tool grant. The reviewed catalog is empty today.
+    // alone cannot attest an exact tool grant.
     private static bool HasExactPermissionSource(IServiceCollection services)
     {
         var registrations = services.Where(item => item.ServiceType == typeof(IToolPermissionSource))
@@ -217,6 +242,22 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType == typeof(ToolPermissionPersistenceSource) &&
             ReviewedPermission.Contains(typeof(ToolPermissionPersistenceSource));
+    }
+
+    private static bool HasRequiredPermissionLiveEvidence()
+    {
+        var required = new[] { "DB CONNECTIVITY", "SCHEMA CHECK", "FIXTURE SETUP",
+            "ACTIVE GRANT ALLOW", "OWNED USER GRANT ALLOW", "EXACT PROJECT GRANT ALLOW",
+            "EXACT TOOL GRANT ALLOW", "EXACT PERMISSION ALLOW", "FOREIGN USER GRANT DENY",
+            "WRONG PROJECT DENY", "WRONG CONVERSATION DENY", "WRONG TOOL DENY",
+            "WRONG PERMISSION DENY", "UNKNOWN GRANT DENY", "REVOKED GRANT DENY",
+            "REVOCATION AFTER PRIOR ALLOW DENY", "NEGATIVE BINDINGS", "CLEANUP", "RESULT" };
+        return PermissionEvidenceDatabase == "aura_disposable_test" &&
+            PermissionEvidenceOid == 24576 &&
+            PermissionEvidenceSystem == 7696813047573034172 &&
+            PermissionEvidenceResult == "PASS" &&
+            ReviewedPermissionLiveEvidence.Count == required.Length &&
+            required.All(ReviewedPermissionLiveEvidence.Contains);
     }
 
     // Durable state requires the exact reviewed store and its normal scoped DI

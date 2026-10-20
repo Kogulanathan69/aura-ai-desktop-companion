@@ -37,7 +37,7 @@ internal static class ProductionCompositionImplementationPlanChecks
             !api.Contains("AddHostedService") &&
             api.Contains("new UnavailableRuntimeCapabilityReadiness()") &&
             inspector.Contains("typeof(HttpCurrentUserContext)") &&
-            inspector.Contains("ReviewedPermission = new HashSet<Type>()") &&
+            inspector.Contains("typeof(ToolPermissionPersistenceSource)") &&
             inspector.Contains("ReviewedExecutionState = new HashSet<Type>()") &&
             inspector.Contains("ReviewedAuditSink = new HashSet<Type>()") &&
             inspector.Contains("ReviewedAuditDelivery = new HashSet<Type>()"),

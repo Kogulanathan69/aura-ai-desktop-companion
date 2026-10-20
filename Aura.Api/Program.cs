@@ -150,6 +150,7 @@ builder.Services.AddScoped<IAuraDbContext>(
 // The request principal, durable subject mapping and owned-row query form the
 // production ownership graph. Readiness remains gated on live JWT and action evidence.
 builder.Services.AddOwnershipRuntimeFoundation();
+builder.Services.AddPermissionRuntimeFoundation();
 
 // Independent verification persistence foundations. Workflow composition remains
 // gated until its ownership scope, tool registry and proof policy are reviewed.

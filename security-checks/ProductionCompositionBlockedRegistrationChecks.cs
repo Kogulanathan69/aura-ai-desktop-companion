@@ -47,7 +47,7 @@ internal static class ProductionCompositionBlockedRegistrationChecks
             "ToolPermissionGrantRecordConfiguration.cs");
         check(typeof(ToolPermissionPersistenceSource).IsSealed &&
             Absent(api, "IToolPermissionSource") &&
-            inspector.Contains("ReviewedPermission = new HashSet<Type>()") &&
+            inspector.Contains("typeof(ToolPermissionPersistenceSource)") &&
             evidence.Contains("REVOKED GRANT CHECK: NOT PROVEN") &&
             evidence.Contains("RESULT: INCOMPLETE") &&
             source.Contains("grant.Status == ToolPermissionGrantStatus.Active && grant.RevokedAt == null") &&

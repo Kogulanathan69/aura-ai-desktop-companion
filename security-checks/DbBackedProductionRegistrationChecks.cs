@@ -62,7 +62,7 @@ internal static class DbBackedProductionRegistrationChecks
             "17L unresolved capabilities have no premature normal-startup registration");
         check(inspector.Contains("typeof(HttpCurrentUserContext)") &&
             inspector.Contains("typeof(ExactOwnershipScopeValidator)") &&
-            new[] { "ReviewedPermission", "ReviewedExecutionState",
+            new[] { "ReviewedExecutionState",
                 "ReviewedAuditSink", "ReviewedAuditDelivery", "ReviewedReconciliation" }
             .All(name => inspector.Contains($"{name} = new HashSet<Type>()", StringComparison.Ordinal)) &&
             review.Contains("No production registrations or catalog entries were added"),
