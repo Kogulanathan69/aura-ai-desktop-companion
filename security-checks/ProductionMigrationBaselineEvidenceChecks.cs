@@ -258,7 +258,7 @@ internal static class ProductionMigrationBaselineEvidenceChecks
         var composition = ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection());
         check(!composition.CompositionComplete && !composition.Ownership &&
             api.Contains("new UnavailableRuntimeCapabilityReadiness()", StringComparison.Ordinal) &&
-            !api.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal),
+            api.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal),
             "15B live PASS cannot mark composition ready or activate production runtime");
     }
 

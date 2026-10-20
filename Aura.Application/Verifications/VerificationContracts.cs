@@ -57,7 +57,7 @@ public sealed class UnavailableExecutionEvidenceSource : IExecutionEvidenceSourc
     }
 }
 
-public interface IVerificationScopeValidator
+public interface IVerificationScopeValidator : IExactActionOwnershipValidator
 {
     // Future adapter: authenticated current user, owned conversation, exact associated
     // project and owned project. IDs or approval alone are not ownership evidence.

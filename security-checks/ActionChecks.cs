@@ -60,6 +60,11 @@ internal static class ActionChecks
         check((await service.ProposeAsync(scope, request with { ToolId = unknown! })).Status == ActionOperationStatus.UnknownTool,
             "11O action references known tool only");
         var waiting = (await service.TransitionAsync(scope, proposed, ActionLifecycleStatus.ApprovalRequired)).Action!;
+        validator.ExactAllow = false;
+        check((await service.TransitionAsync(scope, proposed,
+            ActionLifecycleStatus.ApprovalRequired)).Status == ActionOperationStatus.ScopeDenied,
+            "17V base scope allow cannot bypass exact existing-action ownership denial");
+        validator.ExactAllow = true;
         check(waiting.Status == ActionLifecycleStatus.ApprovalRequired && proposed.Status == ActionLifecycleStatus.Proposed &&
             waiting.Id == proposed.Id && waiting.Scope == proposed.Scope && waiting.CreatedAt == proposed.CreatedAt,
             "11O Proposed to ApprovalRequired returns new immutable value preserving identity/scope");
@@ -179,6 +184,9 @@ internal static class ActionChecks
     }
     private sealed class ScopeFixture(ActionScope owned) : IActionScopeValidator
     {
+        public Task<bool> ValidateActionAsync(ExactActionOwnershipScope action, CancellationToken token) =>
+            ExactAllow ? ValidateAsync(action.Scope, token) : Task.FromResult(false);
+        public bool ExactAllow = true;
         public bool Allow = true, ThrowFailure, Cancel;
         public int Calls;
         public CancellationTokenSource? CancelAndDeny;

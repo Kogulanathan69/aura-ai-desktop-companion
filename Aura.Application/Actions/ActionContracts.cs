@@ -109,7 +109,7 @@ public sealed record ActionOperationResult
     };
 }
 
-public interface IActionScopeValidator
+public interface IActionScopeValidator : IExactActionOwnershipValidator
 {
     // Future implementation must authenticate the current user, verify owned conversation,
     // its exact project association and owned project, following OwnedConversations rules.

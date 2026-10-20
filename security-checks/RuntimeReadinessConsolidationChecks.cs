@@ -127,7 +127,7 @@ internal static class RuntimeReadinessConsolidationChecks
         check(source.Contains("new UnavailableRuntimeCapabilityReadiness()", StringComparison.Ordinal) &&
             !source.Contains("new PersistenceCapabilityReadiness()", StringComparison.Ordinal),
             "12K normal startup uses unavailable runtime readiness, not informational persistence");
-        check(!source.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
+        check(source.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
             !source.Contains("AddScoped<ICurrentUserContext", StringComparison.Ordinal) &&
             !source.Contains("AddScoped<IOwnershipSource", StringComparison.Ordinal),
             "12K normal startup does not register production ownership workflow");

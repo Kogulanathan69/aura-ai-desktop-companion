@@ -245,6 +245,8 @@ internal static class ExecutionIntegrationChecks
     private sealed class ScopeGate(ActionScope scope) : IActionScopeValidator,
         IActionApprovalScopeValidator, IToolExecutionScopeValidator
     {
+        public Task<bool> ValidateActionAsync(ExactActionOwnershipScope action, CancellationToken token) =>
+            ValidateAsync(action.Scope, token);
         public Task<bool> ValidateAsync(ActionScope value, CancellationToken token)
         { token.ThrowIfCancellationRequested(); return Task.FromResult(value == scope); }
     }

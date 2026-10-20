@@ -81,7 +81,7 @@ internal static class ProductionExecutionPolicyCompositionChecks
             !Ready(deny) && !Ready(defaultDeny),
             "14M deny and unavailable defaults remain fail-closed with cancellation");
         check(execution.Contains("ApprovalValidation.IsBoundToApprovedAction", StringComparison.Ordinal) &&
-            execution.Contains("scopes.ValidateAsync(scope, cancellationToken)", StringComparison.Ordinal) &&
+            execution.Contains("scopes.ValidateActionAsync(exactAction, cancellationToken)", StringComparison.Ordinal) &&
             execution.Contains("permissions.HasPermissionAsync(scope, tool, cancellationToken)",
                 StringComparison.Ordinal) &&
             execution.Contains("policy.AllowsAsync(tool, cancellationToken)", StringComparison.Ordinal) &&

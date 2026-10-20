@@ -77,7 +77,7 @@ internal static class VerificationProductionRegistrationChecks
         var api = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "Aura.Api", "Program.cs"));
         check(api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>") &&
             !api.Contains("AddDbContext<AuraDbContext>(") &&
-            api.Contains("AddScoped<IAuraDbContext>(provider =>") &&
+            api.Contains("AddScoped<IAuraDbContext>(") &&
             api.Contains("AddScoped<IExecutionEvidenceSource, OwnedProjectMetadataExecutionEvidenceSource>()") &&
             api.Contains("AddScoped<IExecutionVerificationAssessmentWriter,") &&
             !api.Contains("AddScoped<IVerificationWorkflowService") &&

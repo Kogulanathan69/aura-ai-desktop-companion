@@ -38,8 +38,8 @@ internal static class ExecutionReconciliationChecks
         var evidence = outcome.Evidence!;
         check(outcome.Status == ExecutionReconciliationStatus.Success &&
             evidence.Disposition == ExecutionReconciliationDisposition.NeedsManualReview &&
-            source.Calls == 1 && policy.Calls == 1 && owner.Calls == 2,
-            "11U Reserved default assessment is manual review after two ownership checks");
+            source.Calls == 1 && policy.Calls == 1 && owner.Calls == 3,
+            "17V Reserved assessment includes exact action ownership before policy");
         var writer = new AssessmentWriter();
         var persisted = await new ExecutionReconciliationService(owner, source, policy, clock,
             assessmentWriter: writer).ReconcileAsync(action.Scope, request);
@@ -249,6 +249,8 @@ internal static class ExecutionReconciliationChecks
     }
     private sealed class Owner(ActionScope owned) : IExecutionReconciliationScopeValidator
     {
+        public Task<bool> ValidateActionAsync(ExactActionOwnershipScope action, CancellationToken token) =>
+            ValidateAsync(action.Scope, token);
         public bool Allow = true, RevokeSecond;
         public int Calls;
         public Task<bool> ValidateAsync(ActionScope scope, CancellationToken token)

@@ -28,7 +28,8 @@ public sealed class TrustedToolExecutionService(ToolRegistry tools, IToolExecuti
                 return ExecutionOperationResult.Denied(ExecutionOperationStatus.InvalidActionState);
             if (!ApprovalValidation.IsBoundToApprovedAction(approval, action, scope, action.ToolId))
                 return ExecutionOperationResult.Denied(ExecutionOperationStatus.ApprovalDenied);
-            var owned = await scopes.ValidateAsync(scope, cancellationToken);
+            var exactAction = ExactActionOwnershipScope.FromTrustedAction(action);
+            var owned = await scopes.ValidateActionAsync(exactAction, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!owned) return ExecutionOperationResult.Denied(ExecutionOperationStatus.ScopeDenied);
             if (!tools.TryResolve(action.ToolId, out var tool, out var handler) || tool is null || handler is null ||
@@ -42,7 +43,7 @@ public sealed class TrustedToolExecutionService(ToolRegistry tools, IToolExecuti
             var allowed = await policy.AllowsAsync(tool, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!allowed) return ExecutionOperationResult.Denied(ExecutionOperationStatus.PolicyDenied);
-            owned = await scopes.ValidateAsync(scope, cancellationToken);
+            owned = await scopes.ValidateActionAsync(exactAction, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!owned) return ExecutionOperationResult.Denied(ExecutionOperationStatus.ScopeDenied);
             var startedAt = clock.UtcNow;

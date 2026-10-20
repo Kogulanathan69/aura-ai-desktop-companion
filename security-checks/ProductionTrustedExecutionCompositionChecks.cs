@@ -89,7 +89,7 @@ internal static class ProductionTrustedExecutionCompositionChecks
             service.Contains("IAuditEventWriter? auditWriter", StringComparison.Ordinal),
             "14O trusted service dependency graph is explicit and audit writer remains optional");
         check(service.Contains("ApprovalValidation.IsBoundToApprovedAction", StringComparison.Ordinal) &&
-            service.Contains("scopes.ValidateAsync(scope, cancellationToken)", StringComparison.Ordinal) &&
+            service.Contains("scopes.ValidateActionAsync(exactAction, cancellationToken)", StringComparison.Ordinal) &&
             service.Contains("permissions.HasPermissionAsync(scope, tool, cancellationToken)",
                 StringComparison.Ordinal) &&
             service.Contains("policy.AllowsAsync(tool, cancellationToken)", StringComparison.Ordinal) &&

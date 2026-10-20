@@ -25,6 +25,13 @@ if (args.Length == 1 && args[0] == LiveOwnershipVerification.ProductionCommand)
     return;
 }
 
+if (args.Length == 1 && args[0] == LiveSignedJwtOwnershipEvidence.Command)
+{
+    Environment.ExitCode = await LiveSignedJwtOwnershipEvidence.RunAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 if (args.Length == 1 && args[0] == ProductionMigrationBaselineEvidence.Command)
 {
     Environment.ExitCode = await ProductionMigrationBaselineEvidence.RunAsync(
@@ -206,6 +213,7 @@ await RuntimeReadinessConsolidationChecks.RunAsync(Check);
 await ProductionRuntimeCompositionChecks.RunAsync(Check);
 await ProductionOwnershipCompositionChecks.RunAsync(Check);
 await ProductionOwnershipRegistrationChecks.RunAsync(Check);
+await OwnershipProductionReadinessChecks.RunAsync(Check);
 await ProductionPermissionCompositionChecks.RunAsync(Check);
 await ProductionPermissionEvidenceChecks.RunAsync(Check);
 await ProductionPermissionRegistrationChecks.RunAsync(Check);

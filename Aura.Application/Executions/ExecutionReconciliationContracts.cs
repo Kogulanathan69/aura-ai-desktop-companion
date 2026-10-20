@@ -42,7 +42,7 @@ public sealed class UnavailableExecutionReconciliationSource : IExecutionReconci
     }
 }
 
-public interface IExecutionReconciliationScopeValidator
+public interface IExecutionReconciliationScopeValidator : IExactActionOwnershipValidator
 {
     // Future adapter: authenticate current user, owned conversation, exact project
     // association, and owned project. IDs or approval alone prove no ownership.
@@ -51,6 +51,12 @@ public interface IExecutionReconciliationScopeValidator
 
 public sealed class DenyExecutionReconciliationScopeValidator : IExecutionReconciliationScopeValidator
 {
+    public Task<bool> ValidateActionAsync(ExactActionOwnershipScope actionScope,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(false);
+    }
     public Task<bool> ValidateAsync(ActionScope scope, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

@@ -27,11 +27,11 @@ internal static class ProductionCompositionBlockedRegistrationChecks
             typeof(OwnershipPersistenceSource).IsSealed &&
             typeof(AuthenticatedUserMappingSource).IsSealed &&
             api.Contains("AddScoped<IAuthenticatedUserMappingSource, AuthenticatedUserMappingSource>()") &&
-            !api.Contains(".AddOwnershipRuntimeFoundation(") &&
+            api.Contains(".AddOwnershipRuntimeFoundation(") &&
             Absent(api, "ICurrentUserContext") && Absent(api, "IOwnershipSource") &&
             Absent(api, "IToolExecutionScopeValidator") &&
-            inspector.Contains("ReviewedOwnershipContext = new HashSet<Type>()") &&
-            inspector.Contains("ReviewedOwnershipValidator = new HashSet<Type>()") &&
+            inspector.Contains("typeof(HttpCurrentUserContext)") &&
+            inspector.Contains("typeof(ExactOwnershipScopeValidator)") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Ownership,
             "16B incomplete ownership graph and empty reviewed catalog cannot be promoted");
         return Task.CompletedTask;

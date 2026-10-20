@@ -76,12 +76,15 @@ internal static class FinalProductionEvidenceConsolidationChecks
         var catalogs = typeof(ProductionRuntimeCompositionInspector).GetFields(
             BindingFlags.Static | BindingFlags.NonPublic)
             .Where(f => f.Name.StartsWith("Reviewed", StringComparison.Ordinal)).ToArray();
-        check(catalogs.Length == 17 && catalogs.All(f =>
+        check(catalogs.Length == 19 && catalogs.All(f =>
             f.GetValue(null)?.GetType().GetProperty("Count")?.GetValue(f.GetValue(null)) is int count &&
-                count == (f.Name is "ReviewedVerification" or "ReviewedVerificationWriter" or
-                    "ReviewedVerificationFactory" ? 1 : 0) ||
+                count == (f.Name is "ReviewedOwnershipLiveEvidence" ? 22 :
+                    f.Name is "ReviewedVerification" or "ReviewedVerificationWriter" or
+                    "ReviewedVerificationFactory" or "ReviewedOwnershipContext" or
+                    "ReviewedSubjectMapping" or "ReviewedOwnershipSource" or
+                    "ReviewedOwnershipValidator" or "ReviewedOwnershipFactory" ? 1 : 0) ||
             f.GetValue(null) is Array { Length: 0 }),
-            "17U only source, writer and factory catalogs are populated");
+            "17V ownership and 17U verification foundation catalogs are populated");
         check(inspector.Contains("ReviewedExecutionPolicy = new HashSet<Type>()") &&
             inspector.Contains("ReviewedToolHandlers =") &&
             inspector.Contains("ReviewedTrustedExecution = new HashSet<Type>()") &&

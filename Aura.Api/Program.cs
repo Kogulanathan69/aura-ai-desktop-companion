@@ -144,8 +144,12 @@ builder.Services.AddDbContextFactory<AuraDbContext, AuraDbContextFactory>(option
         connectionString,
         npgsqlOptions => npgsqlOptions.UseVector()));
 
-builder.Services.AddScoped<IAuraDbContext>(provider =>
-    provider.GetRequiredService<AuraDbContext>());
+builder.Services.AddScoped<IAuraDbContext>(
+    OwnershipRuntimeFoundationRegistration.ResolveProductionDbContext);
+
+// The request principal, durable subject mapping and owned-row query form the
+// production ownership graph. Readiness remains gated on live JWT and action evidence.
+builder.Services.AddOwnershipRuntimeFoundation();
 
 // Independent verification persistence foundations. Workflow composition remains
 // gated until its ownership scope, tool registry and proof policy are reviewed.

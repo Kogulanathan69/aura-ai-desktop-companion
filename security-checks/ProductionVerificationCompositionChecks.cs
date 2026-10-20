@@ -99,7 +99,7 @@ internal static class ProductionVerificationCompositionChecks
             contracts.Contains("VerificationOutcome.Inconclusive", StringComparison.Ordinal) &&
             !Ready(unavailable),
             "14L unavailable source and conservative policy cannot synthesize Verified");
-        check(workflow.Contains("scopes.ValidateAsync(scope, cancellationToken)", StringComparison.Ordinal) &&
+        check(workflow.Contains("scopes.ValidateActionAsync(exactAction, cancellationToken)", StringComparison.Ordinal) &&
             workflow.Contains("execution.ActionId != action.Id", StringComparison.Ordinal) &&
             workflow.Contains("execution.Scope != scope", StringComparison.Ordinal) &&
             workflow.Contains("execution.ApprovalId != approval.Id.Value", StringComparison.Ordinal) &&

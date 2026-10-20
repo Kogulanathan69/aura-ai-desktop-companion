@@ -2,7 +2,7 @@ using Aura.Application.Actions;
 
 namespace Aura.Api.Services;
 
-// Foundation only; deliberately unregistered. The existing JWT "sub" maps through
+// The existing JWT "sub" maps through
 // a bounded source to internal User.Id; this request adapter performs no DB query.
 public sealed class HttpCurrentUserContext(IHttpContextAccessor accessor,
     IAuthenticatedUserMappingSource mapping) : ICurrentUserContext

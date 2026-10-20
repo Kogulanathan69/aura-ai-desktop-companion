@@ -36,7 +36,7 @@ internal static class ProductionCompositionImplementationPlanChecks
             !api.Contains("MigrateAsync(") && !api.Contains("EnsureCreated(") &&
             !api.Contains("AddHostedService") &&
             api.Contains("new UnavailableRuntimeCapabilityReadiness()") &&
-            inspector.Contains("ReviewedOwnershipContext = new HashSet<Type>()") &&
+            inspector.Contains("typeof(HttpCurrentUserContext)") &&
             inspector.Contains("ReviewedPermission = new HashSet<Type>()") &&
             inspector.Contains("ReviewedExecutionState = new HashSet<Type>()") &&
             inspector.Contains("ReviewedAuditSink = new HashSet<Type>()") &&

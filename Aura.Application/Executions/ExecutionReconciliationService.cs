@@ -38,6 +38,11 @@ public sealed class ExecutionReconciliationService(IExecutionReconciliationScope
                 snapshot.Version != state.Version || state.ActionId != request.ActionId ||
                 state.Scope != scope)
                 return ExecutionReconciliationResult.Denied(ExecutionReconciliationStatus.StateConflict);
+            var exactAction = ExactActionOwnershipScope.FromTrustedPersistedAction(
+                snapshot.Scope, snapshot.ActionId);
+            owned = await scopes.ValidateActionAsync(exactAction, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!owned) return ExecutionReconciliationResult.Denied(ExecutionReconciliationStatus.ScopeDenied);
             if (state.Status == ActionExecutionStateStatus.Ready)
                 return ExecutionReconciliationResult.Denied(snapshot.ExecutionId == Guid.Empty
                     ? ExecutionReconciliationStatus.NotEligible : ExecutionReconciliationStatus.StateConflict);
@@ -54,7 +59,7 @@ public sealed class ExecutionReconciliationService(IExecutionReconciliationScope
             if (disposition is not (ExecutionReconciliationDisposition.NeedsManualReview or
                 ExecutionReconciliationDisposition.SafeToMarkFailed))
                 return ExecutionReconciliationResult.Denied(ExecutionReconciliationStatus.PolicyDenied);
-            owned = await scopes.ValidateAsync(scope, cancellationToken);
+            owned = await scopes.ValidateActionAsync(exactAction, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!owned) return ExecutionReconciliationResult.Denied(ExecutionReconciliationStatus.ScopeDenied);
             var issuedAt = clock.UtcNow;

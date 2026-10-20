@@ -1,13 +1,19 @@
 using Aura.Application.Actions;
+using Aura.Application.Approvals;
 using Aura.Application.Auditing;
 using Aura.Application.Executions;
 using Aura.Application.Tools;
 using Aura.Application.Verifications;
 using Aura.Application.Common.Interfaces;
+using Aura.Api.Services;
 using Aura.Infrastructure.Data;
 using Aura.Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Aura.Api.Security;
 
@@ -26,10 +32,34 @@ public static class ProductionRuntimeCompositionInspector
 {
     // Add concrete types only after their production registration, lifetime and
     // security evidence have been reviewed. Interface presence is never sufficient.
-    private static readonly IReadOnlySet<Type> ReviewedOwnershipContext = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedSubjectMapping = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedOwnershipSource = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedOwnershipValidator = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedOwnershipContext =
+        new HashSet<Type> { typeof(HttpCurrentUserContext) };
+    private static readonly IReadOnlySet<Type> ReviewedSubjectMapping =
+        new HashSet<Type> { typeof(AuthenticatedUserMappingSource) };
+    private static readonly IReadOnlySet<Type> ReviewedOwnershipSource =
+        new HashSet<Type> { typeof(OwnershipPersistenceSource) };
+    private static readonly IReadOnlySet<Type> ReviewedOwnershipValidator =
+        new HashSet<Type> { typeof(ExactOwnershipScopeValidator) };
+    // Operator-reviewed PASS from the gated signed-JWT HTTP harness on
+    // aura_disposable_test, OID 24576, system 7696813047573034172.
+    private const string OwnershipEvidenceDatabase = "aura_disposable_test";
+    private const uint OwnershipEvidenceOid = 24576;
+    private const long OwnershipEvidenceSystem = 7696813047573034172;
+    private const string OwnershipEvidenceResult = "PASS";
+    private static readonly IReadOnlySet<string> ReviewedOwnershipLiveEvidence =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "DB CONNECTIVITY", "SCHEMA CHECK", "FIXTURE SETUP", "SIGNED JWT ACCEPT",
+            "JWT SUBJECT MAP", "OWNED PROJECT ALLOW", "FOREIGN PROJECT DENY",
+            "UNKNOWN PROJECT DENY", "OWNED CONVERSATION ALLOW", "FOREIGN CONVERSATION DENY",
+            "PROJECT CONVERSATION MISMATCH DENY", "OWNED ACTION ALLOW",
+            "FOREIGN ACTION DENY", "ACTION CONVERSATION MISMATCH DENY",
+            "ACTION PROJECT MISMATCH DENY", "ACTION USER CHAIN MISMATCH DENY",
+            "UNAUTHENTICATED DENY", "MALFORMED TOKEN DENY", "UNKNOWN SUBJECT DENY",
+            "NEGATIVE BINDINGS", "CLEANUP", "RESULT"
+        };
+    private static readonly IReadOnlySet<Type> ReviewedOwnershipFactory =
+        new HashSet<Type> { typeof(AuraDbContextFactory) };
     private static readonly IReadOnlySet<Type> ReviewedPermission = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedExecutionState = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedAuditSink = new HashSet<Type>();
@@ -52,11 +82,23 @@ public static class ProductionRuntimeCompositionInspector
     public static ProductionRuntimeCompositionSnapshot Inspect(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        var ownership = HasOneScoped<IAuraDbContext>(services) &&
+        var ownership = HasRequiredOwnershipLiveEvidence() &&
+            HasExactAuthenticationService(services) &&
+            HasJwtBearerPath(services) &&
+            HasOneSingleton<IHttpContextAccessor>(services, typeof(HttpContextAccessor)) &&
+            HasExactDbContextAlias(services) &&
+            HasOneScoped<AuraDbContext>(services) &&
+            HasExactOwnershipFactory(services) &&
             HasOne<IAuthenticatedUserMappingSource>(services, ReviewedSubjectMapping) &&
             HasOne<ICurrentUserContext>(services, ReviewedOwnershipContext) &&
             HasOne<IOwnershipSource>(services, ReviewedOwnershipSource) &&
-            HasOne<IToolExecutionScopeValidator>(services, ReviewedOwnershipValidator);
+            HasOne<ExactOwnershipScopeValidator>(services, ReviewedOwnershipValidator) &&
+            HasExactValidatorAlias<IExactActionOwnershipValidator>(services) &&
+            HasExactValidatorAlias<IActionScopeValidator>(services) &&
+            HasExactValidatorAlias<IActionApprovalScopeValidator>(services) &&
+            HasExactValidatorAlias<IToolExecutionScopeValidator>(services) &&
+            HasExactValidatorAlias<IVerificationScopeValidator>(services) &&
+            HasExactValidatorAlias<IExecutionReconciliationScopeValidator>(services);
         var permission = HasExactPermissionSource(services);
         var executionState = HasExactExecutionStateStore(services);
         var auditSink = HasExactAuditSink(services);
@@ -85,6 +127,84 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType is { } implementation &&
             reviewed.Contains(implementation);
+    }
+
+    private static bool HasOneSingleton<T>(IServiceCollection services, Type implementation)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(T)).ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Singleton &&
+            registrations[0].ImplementationType == implementation;
+    }
+
+    private static bool HasExactDbContextAlias(IServiceCollection services)
+    {
+        var registrations = services.Where(item =>
+            item.ServiceType == typeof(IAuraDbContext)).ToArray();
+        return registrations.Length == 1 &&
+            OwnershipRuntimeFoundationRegistration.IsExactDbContextAlias(registrations[0]);
+    }
+
+    private static bool HasExactAuthenticationService(IServiceCollection services)
+    {
+        var registrations = services.Where(item =>
+            item.ServiceType == typeof(IAuthenticationService)).ToArray();
+        // ASP.NET Core registers an internal concrete type for this contract.
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType is { } implementation &&
+            implementation.FullName ==
+                "Microsoft.AspNetCore.Authentication.AuthenticationServiceImpl" &&
+            implementation.Assembly == typeof(AuthenticationService).Assembly;
+    }
+
+    private static bool HasJwtBearerPath(IServiceCollection services)
+    {
+        var handlers = services.Where(item =>
+            item.ServiceType == typeof(JwtBearerHandler)).ToArray();
+        var configurations = services.Where(item =>
+            item.ServiceType == typeof(IConfigureOptions<JwtBearerOptions>) &&
+            item.ImplementationType?.FullName ==
+                "Microsoft.AspNetCore.Authentication.JwtBearerConfigureOptions").ToArray();
+        return handlers.Length == 1 &&
+            handlers[0].Lifetime == ServiceLifetime.Transient &&
+            handlers[0].ImplementationType == typeof(JwtBearerHandler) &&
+            configurations.Length == 1 &&
+            configurations[0].Lifetime == ServiceLifetime.Singleton;
+    }
+
+    private static bool HasExactValidatorAlias<T>(IServiceCollection services)
+    {
+        var registrations = services.Where(item => item.ServiceType == typeof(T)).ToArray();
+        return registrations.Length == 1 &&
+            OwnershipRuntimeFoundationRegistration.IsExactValidatorAlias(registrations[0]);
+    }
+
+    private static bool HasExactOwnershipFactory(IServiceCollection services)
+    {
+        var registrations = services.Where(item =>
+            item.ServiceType == typeof(IDbContextFactory<AuraDbContext>)).ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Singleton &&
+            registrations[0].ImplementationType is { } implementation &&
+            ReviewedOwnershipFactory.Contains(implementation);
+    }
+
+    private static bool HasRequiredOwnershipLiveEvidence()
+    {
+        var required = new[] { "DB CONNECTIVITY", "SCHEMA CHECK", "FIXTURE SETUP",
+            "SIGNED JWT ACCEPT", "JWT SUBJECT MAP", "OWNED PROJECT ALLOW",
+            "FOREIGN PROJECT DENY", "UNKNOWN PROJECT DENY", "OWNED CONVERSATION ALLOW",
+            "FOREIGN CONVERSATION DENY", "PROJECT CONVERSATION MISMATCH DENY",
+            "OWNED ACTION ALLOW", "FOREIGN ACTION DENY", "ACTION CONVERSATION MISMATCH DENY",
+            "ACTION PROJECT MISMATCH DENY", "ACTION USER CHAIN MISMATCH DENY",
+            "UNAUTHENTICATED DENY", "MALFORMED TOKEN DENY", "UNKNOWN SUBJECT DENY",
+            "NEGATIVE BINDINGS", "CLEANUP", "RESULT" };
+        return OwnershipEvidenceDatabase == "aura_disposable_test" &&
+            OwnershipEvidenceOid == 24576 && OwnershipEvidenceSystem == 7696813047573034172 &&
+            OwnershipEvidenceResult == "PASS" &&
+            ReviewedOwnershipLiveEvidence.Count == required.Length &&
+            required.All(ReviewedOwnershipLiveEvidence.Contains);
     }
 
     // A generic Permission adapter, unavailable source, factory or registration

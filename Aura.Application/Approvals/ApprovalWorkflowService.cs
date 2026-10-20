@@ -21,7 +21,8 @@ public sealed class ApprovalWorkflowService(ToolRegistry tools, IActionApprovalS
             if (action.Scope != scope) return ApprovalOperationResult.Denied(ApprovalOperationStatus.ScopeDenied);
             if (!ApprovalValidation.CanDecide(action.Status))
                 return ApprovalOperationResult.Denied(ApprovalOperationStatus.InvalidActionState);
-            var owned = await scopes.ValidateAsync(scope, cancellationToken);
+            var exactAction = ExactActionOwnershipScope.FromTrustedAction(action);
+            var owned = await scopes.ValidateActionAsync(exactAction, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!owned) return ApprovalOperationResult.Denied(ApprovalOperationStatus.ScopeDenied);
             // Resolve metadata only; handler reference is discarded, never executed.
@@ -30,7 +31,7 @@ public sealed class ApprovalWorkflowService(ToolRegistry tools, IActionApprovalS
             if (tool is null || tool.Id != action.ToolId || tool.Enabled)
                 return ApprovalOperationResult.Denied(ApprovalOperationStatus.DecisionDenied);
             // Revalidate immediately before producing a decision/evidence. Not a durable atomic guarantee.
-            owned = await scopes.ValidateAsync(scope, cancellationToken);
+            owned = await scopes.ValidateActionAsync(exactAction, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!owned) return ApprovalOperationResult.Denied(ApprovalOperationStatus.ScopeDenied);
             var now = clock.UtcNow;

@@ -64,7 +64,7 @@ internal static class ProductionOwnershipCompositionChecks
 
         var normal = ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection());
         var flags = new RuntimeSafetyOptions();
-        check(!api.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
+        check(api.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
             api.Contains("new UnavailableRuntimeCapabilityReadiness()", StringComparison.Ordinal) &&
             !normal.Ownership && !normal.CompositionComplete &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().Ownership &&
