@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Aura.Infrastructure.Data;
 
-// Read-only exact grant boundary. Normal API startup deliberately does not register it.
+// Read-only exact grant boundary, registered as a scoped production source.
 public sealed class ToolPermissionPersistenceSource(IAuraDbContext db) : IToolPermissionSource
 {
     public async Task<ToolPermissionLookupResult> GetAsync(ToolPermissionValidationRequest request,

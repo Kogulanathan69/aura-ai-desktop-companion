@@ -102,8 +102,7 @@ internal static class FinalProductionCompositionGateChecks
         check(!CanActivate(current, new RuntimeSafetyOptions(), startupRuntime, false),
             "14P current production activation is NOT READY");
 
-        var catalogNames = new[] { "ReviewedPermission",
-            "ReviewedExecutionState", "ReviewedAuditSink", "ReviewedAuditDelivery",
+        var catalogNames = new[] { "ReviewedExecutionState", "ReviewedAuditSink", "ReviewedAuditDelivery",
             "ReviewedReconciliation", "ReviewedExecutionPolicy",
             "ReviewedToolHandlers", "ReviewedTrustedExecution" };
         foreach (var name in catalogNames)

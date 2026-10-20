@@ -24,7 +24,7 @@ internal static class ProductionPermissionRegistrationChecks
         check(evidence.Contains("REVOKED GRANT CHECK: NOT PROVEN") &&
             evidence.Contains("RESULT: INCOMPLETE") &&
             !api.Contains("AddScoped<IToolPermissionSource") &&
-            inspector.Contains("ReviewedPermission = new HashSet<Type>()") &&
+            inspector.Contains("typeof(ToolPermissionPersistenceSource)") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Permission,
             "17C unproven real revoked fixture cannot enter production catalog");
         return Task.CompletedTask;

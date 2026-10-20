@@ -40,8 +40,9 @@ internal static class ProductionPermissionCompositionChecks
 
         var catalog = typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedPermission",
             BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) as IReadOnlySet<Type>;
-        check(catalog is { Count: 0 } && !Ready(new ServiceCollection()),
-            "14G reviewed catalog is empty and a catalog entry alone could not replace DI");
+        check(catalog is { Count: 1 } && catalog.Contains(typeof(ToolPermissionPersistenceSource)) &&
+            !Ready(new ServiceCollection()),
+            "17W reviewed source catalog alone cannot replace exact graph and live evidence");
 
         var root = Directory.GetCurrentDirectory();
         string Read(params string[] parts) => File.ReadAllText(Path.Combine([root, .. parts]));
