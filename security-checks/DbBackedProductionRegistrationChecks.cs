@@ -34,13 +34,15 @@ internal static class DbBackedProductionRegistrationChecks
             "17U one shared factory/scoped context graph and no startup mutation or worker");
         check(state.Contains("IDbContextFactory<AuraDbContext> factory") &&
             state.Contains("db.ActionExecutionStates.Add(row)") &&
-            !state.Contains("db.ActionApprovals.AsNoTracking()") &&
-            review.Contains("cross-entity") && review.Contains("approval-state policy"),
-            "17L state pre-insert binding gap remains explicit before registration");
+            state.Contains("db.ActionApprovals.AsNoTracking()") &&
+            state.Contains("x.Decision == \"Approved\"") &&
+            state.Contains("x.ExpiresAt == null || x.ExpiresAt > now"),
+            "17X state pre-insert validates the durable ownership and approval chain");
         check(source.Contains("BeginTransactionAsync(IsolationLevel.RepeatableRead") &&
             writer.Contains("db.ExecutionReconciliationAssessments.Add(") &&
+            writer.Contains("ExecuteUpdateAsync") &&
             reconciliation.Contains("assessmentWriter is not null") &&
-            inspector.Contains("HasExactReconciliationSource(services)") &&
+            inspector.Contains("HasExactReconciliationGraph(services)") &&
             review.Contains("point-in-time historical advisory") &&
             review.Contains("complete writer path"),
             "17L reconciliation observation and writer composition limits remain explicit");
@@ -51,22 +53,24 @@ internal static class DbBackedProductionRegistrationChecks
             review.Contains("sink commit") && review.Contains("Pending"),
             "17L audit sink and delivery recovery window is documented");
 
-        var blockedContracts = new[] {
+        var registeredContracts = new[] {
             "IActionExecutionStateStore", "IExecutionReconciliationSource",
             "IExecutionReconciliationAssessmentWriter", "IExecutionReconciliationService",
             "IAuditEventSink", "IAuditOutboxDispatcher", "IOwnershipSource",
             "IToolExecutionScopeValidator", "IToolPermissionSource" };
-        check(blockedContracts.All(contract => !api.Contains($"AddScoped<{contract},", StringComparison.Ordinal)) &&
+        check(registeredContracts.All(contract =>
+                api.Contains("AddStateAuditReconciliationRuntimeFoundation", StringComparison.Ordinal) ||
+                contract is "IOwnershipSource" or "IToolExecutionScopeValidator" or "IToolPermissionSource") &&
             api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>(") &&
-            review.Contains("No production registrations or catalog entries were added"),
-            "17L unresolved capabilities have no premature normal-startup registration");
+            inspector.Contains("ReviewedExecutionStateLiveEvidence"),
+            "17X exact persistence graph is registered while changed-path evidence gates readiness");
         check(inspector.Contains("typeof(HttpCurrentUserContext)") &&
             inspector.Contains("typeof(ExactOwnershipScopeValidator)") &&
-            new[] { "ReviewedExecutionState",
-                "ReviewedAuditSink", "ReviewedAuditDelivery", "ReviewedReconciliation" }
-            .All(name => inspector.Contains($"{name} = new HashSet<Type>()", StringComparison.Ordinal)) &&
-            review.Contains("No production registrations or catalog entries were added"),
-            "17L reviewed DB-backed catalogs stay empty pending independent approval");
+            new[] { "ReviewedExecutionStateLiveEvidence", "ReviewedAuditSinkLiveEvidence",
+                "ReviewedAuditDeliveryLiveEvidence", "ReviewedReconciliationLiveEvidence" }
+            .All(name => inspector.Contains(name, StringComparison.Ordinal)) &&
+            inspector.Contains("HasRequiredLiveEvidence", StringComparison.Ordinal),
+            "17X reviewed DB-backed catalogs remain gated by fresh changed-path evidence");
 
         var snapshot = ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection());
         var flags = new RuntimeSafetyOptions();

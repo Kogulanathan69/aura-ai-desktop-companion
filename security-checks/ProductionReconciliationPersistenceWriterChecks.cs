@@ -30,18 +30,18 @@ internal static class ProductionReconciliationPersistenceWriterChecks
             writer.Contains("AssessedAt = evidence.IssuedAt"),
             "16F writer maps exact bounded historical assessment fields");
         check(!writer.Contains("ActionExecutionStates.Add") &&
-            !writer.Contains("TryCompleteAsync") && !writer.Contains("ExecuteUpdateAsync") &&
+            !writer.Contains("TryCompleteAsync") && writer.Contains("ExecuteUpdateAsync") &&
+            writer.Contains("x => x.Version") &&
             !writer.Contains("while (") && !writer.Contains("Task.Delay") &&
             writer.Contains("catch (OperationCanceledException)") &&
             writer.Contains("catch (Exception) { return false; }") &&
             workflow.Contains("assessmentWriter.WriteAsync(evidence, cancellationToken)") &&
             workflow.Contains("ExecutionReconciliationStatus.Failed"),
             "16F persistence is opt-in, cancellation-aware, bounded and cannot mutate execution state");
-        check(!api.Contains("IExecutionReconciliationAssessmentWriter") &&
-            !api.Contains("IExecutionReconciliationSource") &&
-            inspector.Contains("ReviewedReconciliation = new HashSet<Type>()") &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation") &&
+            inspector.Contains("ReviewedReconciliationLiveEvidence") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Reconciliation,
-            "16F unregistered writer/source and empty catalog cannot assert production readiness");
+            "17X registered writer/source remain gated by fresh production evidence");
         return Task.CompletedTask;
     }
 }

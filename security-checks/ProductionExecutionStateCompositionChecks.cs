@@ -38,8 +38,9 @@ internal static class ProductionExecutionStateCompositionChecks
 
         var catalog = typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedExecutionState",
             BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) as IReadOnlySet<Type>;
-        check(catalog is { Count: 0 } && !Ready(new ServiceCollection()),
-            "14H catalog is empty and catalog evidence alone cannot replace DI");
+        check(catalog is { Count: 1 } && catalog.Contains(typeof(ActionExecutionStatePersistenceStore)) &&
+            !Ready(new ServiceCollection()),
+            "17X exact catalog cannot replace DI and fresh changed-path evidence");
 
         var root = Directory.GetCurrentDirectory();
         string Read(params string[] parts) => File.ReadAllText(Path.Combine([root, .. parts]));
@@ -96,12 +97,9 @@ internal static class ProductionExecutionStateCompositionChecks
         check(flags.ToolExecutionEnabled && !Ready(new ServiceCollection()) &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().ExecutionState,
             "14H flags and informational live evidence cannot substitute for production state DI");
-        check(!api.Contains("AddScoped<IActionExecutionStateStore", StringComparison.Ordinal) &&
-            !api.Contains("AddSingleton<IActionExecutionStateStore", StringComparison.Ordinal) &&
-            !api.Contains("AddTransient<IActionExecutionStateStore", StringComparison.Ordinal) &&
-            !api.Contains("ActionExecutionStatePersistenceStore", StringComparison.Ordinal) &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation", StringComparison.Ordinal) &&
             api.Contains("new UnavailableRuntimeCapabilityReadiness()", StringComparison.Ordinal),
-            "14H normal API has no production state-store registration or readiness claim");
+            "17X normal API has exact state registration while runtime readiness remains unavailable");
         check(!api.Contains("AddScoped<ITrustedToolExecutionService", StringComparison.Ordinal) &&
             !api.Contains("AddHostedService", StringComparison.Ordinal) &&
             !api.Contains("MigrateAsync(", StringComparison.Ordinal) &&

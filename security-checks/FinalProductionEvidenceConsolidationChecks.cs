@@ -76,7 +76,7 @@ internal static class FinalProductionEvidenceConsolidationChecks
         var catalogs = typeof(ProductionRuntimeCompositionInspector).GetFields(
             BindingFlags.Static | BindingFlags.NonPublic)
             .Where(f => f.Name.StartsWith("Reviewed", StringComparison.Ordinal)).ToArray();
-        check(catalogs.Length == 22 && catalogs.All(f =>
+        check(catalogs.Length == 26 && catalogs.All(f =>
             f.GetValue(null)?.GetType().GetProperty("Count")?.GetValue(f.GetValue(null)) is int count &&
                 count == (f.Name is "ReviewedOwnershipLiveEvidence" ? 22 :
                     f.Name is "ReviewedPermissionLiveEvidence" ? 19 :
@@ -85,9 +85,12 @@ internal static class FinalProductionEvidenceConsolidationChecks
                     "ReviewedSubjectMapping" or "ReviewedOwnershipSource" or
                     "ReviewedOwnershipValidator" or "ReviewedOwnershipFactory" or
                     "ReviewedPermission" or "ReviewedPermissionPolicy" or
-                    "ReviewedPermissionValidator" ? 1 : 0) ||
+                    "ReviewedPermissionValidator" or "ReviewedExecutionState" or
+                    "ReviewedAuditDelivery" ? 1 :
+                    f.Name is "ReviewedAuditSink" ? 2 :
+                    f.Name is "ReviewedReconciliation" ? 4 : 0) ||
             f.GetValue(null) is Array { Length: 0 }),
-            "17W ownership, permission and verification foundation catalogs are populated");
+            "17X reviewed foundation catalogs and pending evidence gates are exact");
         check(inspector.Contains("ReviewedExecutionPolicy = new HashSet<Type>()") &&
             inspector.Contains("ReviewedToolHandlers =") &&
             inspector.Contains("ReviewedTrustedExecution = new HashSet<Type>()") &&

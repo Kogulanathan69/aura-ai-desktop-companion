@@ -31,10 +31,10 @@ internal static class ProductionReconciliationRegistrationChecks
             "17F stale snapshot, readback and repeated historical assessments are explicit");
         check(writer.Contains("evidence.ObservedVersion != 1") &&
             writer.Contains("SaveChangesAsync(cancellationToken)") &&
-            !writer.Contains("ExecuteUpdateAsync") && !writer.Contains("Task.Delay") &&
-            !writer.Contains("BeginTransactionAsync") &&
-            !writer.Contains("ActionExecutionStates"),
-            "17F writer persists bounded advisory evidence without state mutation or retry");
+            writer.Contains("ExecuteUpdateAsync") && !writer.Contains("Task.Delay") &&
+            writer.Contains("BeginTransactionAsync") &&
+            writer.Contains("ActionExecutionStates.Where"),
+            "17X writer locks the exact reserved version before advisory persistence without retry");
         check(document.Contains("LIVE RESULT: OPERATOR-REPORTED PASS") &&
             new[] { "DB CONNECTIVITY", "SCHEMA CHECK", "FIXTURE SETUP",
                 "VALID RESERVED ASSESSMENT", "STALE VERSION", "TERMINAL STATE",
@@ -48,12 +48,11 @@ internal static class ProductionReconciliationRegistrationChecks
             !new RuntimeSafetyOptions().ProductionAdaptersEnabled &&
             !new RuntimeSafetyOptions().ToolExecutionEnabled,
             "17F reported writer PASS is bounded; baseline and concurrent freshness remain unproven");
-        check(!api.Contains("AddScoped<IExecutionReconciliationSource") &&
-            !api.Contains("AddScoped<IExecutionReconciliationAssessmentWriter") &&
-            inspector.Contains("ReviewedReconciliation = new HashSet<Type>()") &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation") &&
+            inspector.Contains("ReviewedReconciliationLiveEvidence") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Reconciliation &&
             api.Contains("new UnavailableFinalProductionSecurityApprovalSource()"),
-            "17F unproven writer path leaves reconciliation unregistered and unready");
+            "17X exact writer path is registered but remains unready without fresh evidence");
         return Task.CompletedTask;
     }
 }

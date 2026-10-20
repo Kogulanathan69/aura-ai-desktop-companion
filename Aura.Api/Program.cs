@@ -151,6 +151,7 @@ builder.Services.AddScoped<IAuraDbContext>(
 // production ownership graph. Readiness remains gated on live JWT and action evidence.
 builder.Services.AddOwnershipRuntimeFoundation();
 builder.Services.AddPermissionRuntimeFoundation();
+builder.Services.AddStateAuditReconciliationRuntimeFoundation();
 
 // Independent verification persistence foundations. Workflow composition remains
 // gated until its ownership scope, tool registry and proof policy are reviewed.

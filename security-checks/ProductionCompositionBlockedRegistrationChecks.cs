@@ -70,8 +70,8 @@ internal static class ProductionCompositionBlockedRegistrationChecks
         var evidence = Source("STEP-15D-DURABLE-EXECUTION-STATE-EVIDENCE-REGISTRATION-REVIEW.md");
         check(typeof(ActionExecutionStatePersistenceStore).IsSealed &&
             Absent(api, "IActionExecutionStateStore") &&
-            !api.Contains("AddDbContextFactory<AuraDbContext>") &&
-            inspector.Contains("ReviewedExecutionState = new HashSet<Type>()") &&
+            api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>") &&
+            inspector.Contains("ReviewedExecutionStateLiveEvidence") &&
             evidence.Contains("baseline", StringComparison.OrdinalIgnoreCase) &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).ExecutionState &&
             !api.Contains("MigrateAsync(") && !api.Contains("EnsureCreated(") &&
@@ -89,9 +89,9 @@ internal static class ProductionCompositionBlockedRegistrationChecks
         var snapshot = ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection());
         check(typeof(SecurityAuditPersistenceSink).IsSealed &&
             typeof(SecurityAuditOutboxDispatcher).IsSealed &&
-            Absent(api, "IAuditEventSink") && Absent(api, "IAuditOutboxDispatcher") &&
-            inspector.Contains("ReviewedAuditSink = new HashSet<Type>()") &&
-            inspector.Contains("ReviewedAuditDelivery = new HashSet<Type>()") &&
+            api.Contains("AddStateAuditReconciliationRuntimeFoundation") &&
+            inspector.Contains("ReviewedAuditSinkLiveEvidence") &&
+            inspector.Contains("ReviewedAuditDeliveryLiveEvidence") &&
             evidence.Contains("ambiguous", StringComparison.OrdinalIgnoreCase) &&
             !delivery.Contains("BackgroundService") && !delivery.Contains("PeriodicTimer") &&
             !api.Contains("AddHostedService") && !snapshot.AuditSink && !snapshot.AuditDelivery &&

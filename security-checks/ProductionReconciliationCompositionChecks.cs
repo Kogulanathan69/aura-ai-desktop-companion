@@ -40,8 +40,12 @@ internal static class ProductionReconciliationCompositionChecks
 
         var catalog = typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedReconciliation",
             BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) as IReadOnlySet<Type>;
-        check(catalog is { Count: 0 } && !Ready(new ServiceCollection()),
-            "14K reviewed catalog is empty and cannot replace matching DI");
+        check(catalog is { Count: 4 } &&
+            catalog.Contains(typeof(ExecutionReconciliationPersistenceSource)) &&
+            catalog.Contains(typeof(ExecutionReconciliationAssessmentPersistenceWriter)) &&
+            catalog.Contains(typeof(ConservativeExecutionReconciliationPolicy)) &&
+            catalog.Contains(typeof(ExecutionReconciliationService)) && !Ready(new ServiceCollection()),
+            "17X complete reconciliation catalog cannot replace DI and fresh evidence");
 
         var otherCapabilities = new ServiceCollection();
         otherCapabilities.AddScoped<IActionExecutionStateStore, ActionExecutionStatePersistenceStore>();
@@ -63,14 +67,12 @@ internal static class ProductionReconciliationCompositionChecks
             "20261014000002_AddSecurityPersistenceBundle.cs");
         var api = Read("Aura.Api", "Program.cs");
 
-        check(inspector.Contains("HasExactReconciliationSource(services)", StringComparison.Ordinal) &&
-            inspector.Contains("registrations.Length == 1", StringComparison.Ordinal) &&
-            inspector.Contains("ImplementationType == typeof(ExecutionReconciliationPersistenceSource)",
-                StringComparison.Ordinal) &&
-            inspector.Contains("ReviewedReconciliation.Contains(typeof(ExecutionReconciliationPersistenceSource))",
+        check(inspector.Contains("HasExactReconciliationGraph(services)", StringComparison.Ordinal) &&
+            inspector.Contains("HasReviewedScoped<IExecutionReconciliationSource", StringComparison.Ordinal) &&
+            inspector.Contains("ExecutionReconciliationPersistenceSource>(services",
                 StringComparison.Ordinal) &&
             inspector.Contains("ServiceLifetime.Scoped", StringComparison.Ordinal),
-            "14K requires one scoped exact reviewed source, independent of source-code existence");
+            "17X requires the complete scoped exact reviewed reconciliation graph");
         check(entity.Contains("ActionId", StringComparison.Ordinal) &&
             entity.Contains("UserId", StringComparison.Ordinal) &&
             entity.Contains("ConversationId", StringComparison.Ordinal) &&
@@ -119,12 +121,9 @@ internal static class ProductionReconciliationCompositionChecks
         check(flags.ProductionAdaptersEnabled && !Ready(new ServiceCollection()) &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().Reconciliation,
             "14K runtime flags and disposable live evidence cannot replace reviewed production DI");
-        check(!api.Contains("AddScoped<IExecutionReconciliationSource", StringComparison.Ordinal) &&
-            !api.Contains("AddSingleton<IExecutionReconciliationSource", StringComparison.Ordinal) &&
-            !api.Contains("AddTransient<IExecutionReconciliationSource", StringComparison.Ordinal) &&
-            !api.Contains("ExecutionReconciliationPersistenceSource", StringComparison.Ordinal) &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation", StringComparison.Ordinal) &&
             api.Contains("new UnavailableRuntimeCapabilityReadiness()", StringComparison.Ordinal),
-            "14K normal API has no reconciliation registration or readiness claim");
+            "17X normal API has exact reconciliation registration without runtime readiness");
         check(!api.Contains("AddHostedService", StringComparison.Ordinal) &&
             !api.Contains("BackgroundService", StringComparison.Ordinal) &&
             !api.Contains("PeriodicTimer", StringComparison.Ordinal) &&

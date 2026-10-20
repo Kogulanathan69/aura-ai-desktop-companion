@@ -37,15 +37,15 @@ internal static class ProductionExecutionStateRegistrationChecks
         var catalog = typeof(ProductionRuntimeCompositionInspector).GetField(
             "ReviewedExecutionState", BindingFlags.NonPublic | BindingFlags.Static)?
             .GetValue(null) as IReadOnlySet<Type>;
-        check(catalog is { Count: 0 } &&
-            inspector.Contains("ReviewedExecutionState = new HashSet<Type>()", StringComparison.Ordinal),
-            "17A unreviewed evidence cannot enter the exact production catalog");
+        check(catalog is { Count: 1 } && catalog.Contains(typeof(ActionExecutionStatePersistenceStore)) &&
+            inspector.Contains("ReviewedExecutionStateLiveEvidence", StringComparison.Ordinal),
+            "17X exact catalog remains independently gated by fresh changed-path evidence");
         check(api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>", StringComparison.Ordinal) &&
             !api.Contains("AddPooledDbContextFactory<AuraDbContext>", StringComparison.Ordinal) &&
-            !api.Contains("IActionExecutionStateStore", StringComparison.Ordinal) &&
+            api.Contains("AddStateAuditReconciliationRuntimeFoundation", StringComparison.Ordinal) &&
             !api.Contains("AddDbContext<AuraDbContext>", StringComparison.Ordinal) &&
             api.Contains("AddScoped<IAuraDbContext>", StringComparison.Ordinal),
-            "17U shared factory exists while execution state store stays unregistered");
+            "17X shared factory and exact execution-state graph are registered");
         check(inspector.Contains("registrations.Length == 1", StringComparison.Ordinal) &&
             inspector.Contains("registrations[0].Lifetime == ServiceLifetime.Scoped", StringComparison.Ordinal) &&
             inspector.Contains("ImplementationType == typeof(ActionExecutionStatePersistenceStore)",

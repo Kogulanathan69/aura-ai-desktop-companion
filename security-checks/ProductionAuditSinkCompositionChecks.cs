@@ -38,8 +38,9 @@ internal static class ProductionAuditSinkCompositionChecks
 
         var catalog = typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedAuditSink",
             BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) as IReadOnlySet<Type>;
-        check(catalog is { Count: 0 } && !Ready(new ServiceCollection()),
-            "14I catalog remains empty and cannot replace a DI registration");
+        check(catalog is { Count: 2 } && catalog.Contains(typeof(SecurityAuditPersistenceSink)) &&
+            catalog.Contains(typeof(AuditEventWriter)) && !Ready(new ServiceCollection()),
+            "17X exact sink catalog cannot replace DI and fresh changed-path evidence");
 
         var deliveryOnly = new ServiceCollection();
         deliveryOnly.AddScoped<IAuditOutboxDispatcher, SecurityAuditOutboxDispatcher>();
@@ -103,12 +104,9 @@ internal static class ProductionAuditSinkCompositionChecks
         check(flags.AuditPersistenceEnabled && !Ready(new ServiceCollection()) &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().AuditSink,
             "14I runtime flags and existing implementation cannot inflate audit readiness");
-        check(!api.Contains("AddScoped<IAuditEventSink", StringComparison.Ordinal) &&
-            !api.Contains("AddSingleton<IAuditEventSink", StringComparison.Ordinal) &&
-            !api.Contains("AddTransient<IAuditEventSink", StringComparison.Ordinal) &&
-            !api.Contains("SecurityAuditPersistenceSink", StringComparison.Ordinal) &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation", StringComparison.Ordinal) &&
             api.Contains("new UnavailableRuntimeCapabilityReadiness()", StringComparison.Ordinal),
-            "14I normal API has no audit-sink registration or readiness claim");
+            "17X normal API has exact audit-sink registration without runtime readiness");
         check(!api.Contains("AddScoped<IAuditOutboxDispatcher", StringComparison.Ordinal) &&
             !api.Contains("AddHostedService", StringComparison.Ordinal) &&
             !api.Contains("MigrateAsync(", StringComparison.Ordinal) &&

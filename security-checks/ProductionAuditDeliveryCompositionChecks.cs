@@ -38,8 +38,9 @@ internal static class ProductionAuditDeliveryCompositionChecks
 
         var catalog = typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedAuditDelivery",
             BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) as IReadOnlySet<Type>;
-        check(catalog is { Count: 0 } && !Ready(new ServiceCollection()),
-            "14J catalog is empty and catalog evidence alone cannot replace DI");
+        check(catalog is { Count: 1 } && catalog.Contains(typeof(SecurityAuditOutboxDispatcher)) &&
+            !Ready(new ServiceCollection()),
+            "17X exact delivery catalog cannot replace DI and fresh changed-path evidence");
 
         var sinkAndLogs = new ServiceCollection();
         sinkAndLogs.AddScoped<IAuditEventSink, SecurityAuditPersistenceSink>();
@@ -112,12 +113,9 @@ internal static class ProductionAuditDeliveryCompositionChecks
         check(flags.AuditPersistenceEnabled && !Ready(new ServiceCollection()) &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().AuditSink,
             "14J flags and disposable live evidence cannot replace production delivery DI");
-        check(!api.Contains("AddScoped<IAuditOutboxDispatcher", StringComparison.Ordinal) &&
-            !api.Contains("AddSingleton<IAuditOutboxDispatcher", StringComparison.Ordinal) &&
-            !api.Contains("AddTransient<IAuditOutboxDispatcher", StringComparison.Ordinal) &&
-            !api.Contains("SecurityAuditOutboxDispatcher", StringComparison.Ordinal) &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation", StringComparison.Ordinal) &&
             api.Contains("new UnavailableRuntimeCapabilityReadiness()", StringComparison.Ordinal),
-            "14J normal API has no dispatcher registration or readiness claim");
+            "17X normal API has exact dispatcher registration without runtime readiness");
         check(!api.Contains("AddHostedService", StringComparison.Ordinal) &&
             !api.Contains("BackgroundService", StringComparison.Ordinal) &&
             !api.Contains("PeriodicTimer", StringComparison.Ordinal) &&

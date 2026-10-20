@@ -3,6 +3,7 @@ using Aura.Application.Tools;
 using Aura.Domain.Entities;
 using Aura.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace Aura.Infrastructure.Services;
 
@@ -30,6 +31,24 @@ public sealed class ExecutionReconciliationAssessmentPersistenceWriter(
         try
         {
             await using var db = await factory.CreateDbContextAsync(cancellationToken);
+            await using var tx = await db.Database.BeginTransactionAsync(
+                IsolationLevel.RepeatableRead, cancellationToken);
+            // The no-op conditional update locks the exact Reserved/version row until
+            // the assessment insert commits. Completion cannot cross this boundary.
+            var current = await db.ActionExecutionStates.Where(x =>
+                x.ActionId == evidence.ActionId.Value &&
+                x.UserId == evidence.Scope.UserId &&
+                x.ConversationId == evidence.Scope.ConversationId &&
+                x.ProjectId == evidence.Scope.ProjectId &&
+                x.ToolId == evidence.ToolId.Value &&
+                x.ApprovalId == evidence.ApprovalId &&
+                x.ExecutionId == evidence.ExecutionId &&
+                x.Status == DurableExecutionStatus.Reserved &&
+                x.Version == evidence.ObservedVersion &&
+                x.ApprovalConsumed && x.ReservedAt != null && x.CompletedAt == null)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Version, x => x.Version),
+                    cancellationToken);
+            if (current != 1) return false;
             db.ExecutionReconciliationAssessments.Add(new ExecutionReconciliationAssessmentRecord
             {
                 Id = evidence.Id.Value,
@@ -47,6 +66,7 @@ public sealed class ExecutionReconciliationAssessmentPersistenceWriter(
                 AssessedAt = evidence.IssuedAt
             });
             var saved = await db.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             return saved == 1;
         }
