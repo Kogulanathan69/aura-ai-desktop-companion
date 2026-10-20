@@ -83,6 +83,21 @@ internal static class ProductionMigrationBaselineEvidenceChecks
         check(ProductionMigrationBaselineEvidence.Evaluate(baseline) ==
             ProductionMigrationBaselineEvidence.Stage.Passed,
             "15B complete synthetic catalog satisfies exact source-derived manifest");
+        check(ProductionMigrationBaselineEvidence.Evaluate(baseline with
+        {
+            Columns = baseline.Columns.Select(x => x.Table == "Projects" && x.Name == "Version"
+                ? x with { DefaultValue = null } : x).ToArray()
+        }) == ProductionMigrationBaselineEvidence.Stage.IncompatibleColumn &&
+            ProductionMigrationBaselineEvidence.Evaluate(baseline with
+            {
+                Triggers = []
+            }) == ProductionMigrationBaselineEvidence.Stage.MissingTrigger &&
+            ProductionMigrationBaselineEvidence.Evaluate(baseline with
+            {
+                Constraints = baseline.Constraints.Where(x =>
+                    x.Name != "CK_Projects_Version_Positive").ToArray()
+            }) == ProductionMigrationBaselineEvidence.Stage.MissingCheckConstraint,
+            "17T baseline rejects missing version default, trigger, or positive constraint");
         check(ProductionMigrationBaselineEvidence.Evaluate(baseline with { HistoryExists = false }) ==
             ProductionMigrationBaselineEvidence.Stage.MissingHistory,
             "15B absent migration history table fails");
@@ -273,6 +288,13 @@ internal static class ProductionMigrationBaselineEvidenceChecks
                 item.Columns + ") WHERE " + item.Predicate)).ToArray();
         return new(true, ProductionMigrationBaselineEvidence.ExpectedMigrations,
             ProductionMigrationBaselineEvidence.RequiredTables.ToHashSet(StringComparer.Ordinal),
-            ProductionMigrationBaselineEvidence.RequiredColumns, constraints, indexes);
+            ProductionMigrationBaselineEvidence.RequiredColumns, constraints, indexes,
+            [new("TR_Projects_IncrementVersion",
+                "CREATE TRIGGER TR_Projects_IncrementVersion BEFORE INSERT OR UPDATE ON Projects " +
+                "EXECUTE FUNCTION aura_increment_project_version()",
+                "IF NEW.Version IS DISTINCT FROM 1 THEN RAISE EXCEPTION; END IF; " +
+                "IF NEW.Version IS DISTINCT FROM OLD.Version THEN RAISE EXCEPTION; " +
+                "END IF; IF OLD.Version = 9223372036854775807 THEN RAISE EXCEPTION; " +
+                "END IF; NEW.Version := OLD.Version + 1;")]);
     }
 }

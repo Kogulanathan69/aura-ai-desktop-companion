@@ -34,6 +34,7 @@ public sealed class ExecutionVerificationAssessmentPersistenceWriter(
             evidence.ToolId.Value != "owned-project-metadata-read" ||
             evidence.IndependentProof is not { } proof ||
             proof.ProjectId != evidence.Scope.ProjectId ||
+            proof.ProjectVersion <= 0 ||
             proof.ExecutionVersion != executionVersion ||
             proof.ProofSource != VerificationProofSource.OwnedProjectMetadata ||
             proof.ProofVersion != 1 ||
@@ -91,7 +92,7 @@ public sealed class ExecutionVerificationAssessmentPersistenceWriter(
                 // with a serialization error; an update after the lock waits for commit.
                 await using var command = db.Database.GetDbConnection().CreateCommand();
                 command.Transaction = transaction.GetDbTransaction();
-                command.CommandText = "SELECT \"UpdatedAt\" FROM \"Projects\" " +
+                command.CommandText = "SELECT \"UpdatedAt\", \"Version\" FROM \"Projects\" " +
                     "WHERE \"Id\" = @projectId AND \"UserId\" = @userId FOR UPDATE";
                 var projectId = command.CreateParameter();
                 projectId.ParameterName = "projectId";
@@ -104,6 +105,8 @@ public sealed class ExecutionVerificationAssessmentPersistenceWriter(
                 await using var reader = await command.ExecuteReaderAsync(cancellationToken);
                 if (!await reader.ReadAsync(cancellationToken) || reader.IsDBNull(0) ||
                     reader.GetDateTime(0) != evidence.IndependentProof!.ProjectUpdatedAt ||
+                    reader.IsDBNull(1) ||
+                    reader.GetInt64(1) != evidence.IndependentProof.ProjectVersion ||
                     await reader.ReadAsync(cancellationToken))
                     return false;
             }

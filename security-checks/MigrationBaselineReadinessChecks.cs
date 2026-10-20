@@ -28,7 +28,8 @@ internal static class MigrationBaselineReadinessChecks
             "20261014000003_AddSecurityAuditOutbox.cs",
             "20261014000004_HardenSecurityAuditOutboxDelivery.cs",
             "20261018000000_AddTrustedVerificationFoundation.cs",
-            "20261019000000_AddIndependentVerificationOutcome.cs"
+            "20261019000000_AddIndependentVerificationOutcome.cs",
+            "20261019000001_AddProjectVersion.cs"
         };
 
         check(

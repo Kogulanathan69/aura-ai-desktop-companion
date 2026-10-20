@@ -70,15 +70,15 @@ public sealed class OwnedProjectMetadataExecutionEvidenceSource(
             {
                 var project = await db.Projects.AsNoTracking()
                     .Where(x => x.Id == scope.ProjectId && x.UserId == scope.UserId)
-                    .Select(x => new { x.Id, x.UpdatedAt })
+                    .Select(x => new { x.Id, x.Version, x.UpdatedAt })
                     .SingleOrDefaultAsync(cancellationToken);
-                if (project is null || project.UpdatedAt == default ||
+                if (project is null || project.Version <= 0 || project.UpdatedAt == default ||
                     project.UpdatedAt.Kind != DateTimeKind.Utc)
                     return null;
                 observation = new(project.Id, project.UpdatedAt,
-                    VerificationProofSource.OwnedProjectMetadata, 1);
+                    VerificationProofSource.OwnedProjectMetadata, 1, project.Version);
                 independentProof = OwnedProjectMetadataProof.FromAuthoritativeRead(
-                    project.Id, project.UpdatedAt, state.Version);
+                    project.Id, project.UpdatedAt, state.Version, project.Version);
                 if (independentProof is null) return null;
             }
             await transaction.CommitAsync(cancellationToken);

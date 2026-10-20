@@ -11,8 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Aura.Api.Security;
 
-// Informational only. Every field requires one exact registered implementation from
-// the reviewed production catalog. The catalog is empty until separate review adds one.
+// Informational only. Every field requires its complete exact production graph.
 public sealed record ProductionRuntimeCompositionSnapshot(
     bool Ownership, bool Permission, bool ExecutionState, bool AuditSink,
     bool AuditDelivery, bool Reconciliation, bool Verification,
@@ -36,10 +35,14 @@ public static class ProductionRuntimeCompositionInspector
     private static readonly IReadOnlySet<Type> ReviewedAuditSink = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedAuditDelivery = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedReconciliation = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedVerification = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedVerificationWriter = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedVerification =
+        new HashSet<Type> { typeof(OwnedProjectMetadataExecutionEvidenceSource) };
+    private static readonly IReadOnlySet<Type> ReviewedVerificationWriter =
+        new HashSet<Type> { typeof(ExecutionVerificationAssessmentPersistenceWriter) };
     private static readonly IReadOnlySet<Type> ReviewedVerificationWorkflow = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedVerificationFactory = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedVerificationFactory =
+        new HashSet<Type> { typeof(AuraDbContextFactory) };
+    private static readonly IReadOnlySet<Type> ReviewedVerificationPolicy = new HashSet<Type>();
     private static readonly IReadOnlySet<Type> ReviewedExecutionPolicy = new HashSet<Type>();
     private static readonly IReadOnlyList<(Type HandlerType, string ToolId, ToolCapability Capability,
         ToolPermissionRequirement Permission)> ReviewedToolHandlers =
@@ -62,7 +65,10 @@ public static class ProductionRuntimeCompositionInspector
         var verification = HasExactVerificationSource(services) &&
             HasExactVerificationWriter(services) &&
             HasExactVerificationWorkflow(services) &&
-            HasExactVerificationFactory(services);
+            HasExactVerificationFactory(services) &&
+            HasExactVerificationPolicy(services) &&
+            HasOneScoped<IVerificationScopeValidator>(services) &&
+            HasOneScoped<ToolRegistry>(services);
         var executionPolicy = HasExactExecutionPolicy(services);
         var toolHandlers = MatchesReviewedToolHandlers(services, ReviewedToolHandlers);
         var trustedExecution = HasExactTrustedExecutionService(services) &&
@@ -182,6 +188,17 @@ public static class ProductionRuntimeCompositionInspector
             registrations[0].Lifetime == ServiceLifetime.Singleton &&
             registrations[0].ImplementationType is { } implementation &&
             ReviewedVerificationFactory.Contains(implementation);
+    }
+
+    private static bool HasExactVerificationPolicy(IServiceCollection services)
+    {
+        var registrations = services.Where(item =>
+            item.ServiceType == typeof(IIndependentVerificationPolicy)).ToArray();
+        return registrations.Length == 1 &&
+            registrations[0].Lifetime == ServiceLifetime.Scoped &&
+            registrations[0].ImplementationType is { } implementation &&
+            implementation != typeof(ConservativeVerificationPolicy) &&
+            ReviewedVerificationPolicy.Contains(implementation);
     }
 
     // No allowing production policy exists yet. The deny-only implementation

@@ -19,9 +19,9 @@ internal static class IndependentVerificationOutcomeMigrationChecks
         var review = Read("STEP-17Q-INDEPENDENT-VERIFICATION-OUTCOME-MIGRATION-AND-PERSISTENCE.md");
         var migration = new AddIndependentVerificationOutcome();
         var baseline = ProductionMigrationBaselineEvidence.ExpectedMigrations;
-        check(baseline.Length == 7 &&
-            baseline[^1] == LiveIndependentVerificationOutcomeMigrationApplication.TargetMigration &&
-            baseline[..^1].SequenceEqual([
+        check(baseline.Length == 8 &&
+            baseline[^2] == LiveIndependentVerificationOutcomeMigrationApplication.TargetMigration &&
+            baseline[..^2].SequenceEqual([
                 "20261014000000_AddToolPermissionGrants",
                 "20261014000001_AddActionExecutionStates",
                 "20261014000002_AddSecurityPersistenceBundle",
@@ -95,11 +95,11 @@ internal static class IndependentVerificationOutcomeMigrationChecks
             output.SequenceEqual(["INPUT: FAIL"]),
             "17Q wrong reviewed loopback system identifier denies before database call");
         check(LiveIndependentVerificationOutcomeMigrationApplication.MatchesPreMigrationState(
-                baseline[..^1], [baseline[^1]]) &&
+                baseline[..^2], [baseline[^2], baseline[^1]]) &&
             !LiveIndependentVerificationOutcomeMigrationApplication.MatchesPreMigrationState(
-                baseline[..^2], [baseline[^1]]) &&
+                baseline[..^3], [baseline[^2], baseline[^1]]) &&
             !LiveIndependentVerificationOutcomeMigrationApplication.MatchesPreMigrationState(
-                baseline[..^1], [baseline[^1], "unexpected"]) &&
+                baseline[..^2], [baseline[^2], "unexpected"]) &&
             apply.Contains("pg_control_system()") &&
             apply.Contains("MigrateAsync(TargetMigration, token)") &&
             entry.Contains("args[0] == LiveIndependentVerificationOutcomeMigrationApplication.Command"),
@@ -109,8 +109,8 @@ internal static class IndependentVerificationOutcomeMigrationChecks
             workflow.Contains("execution.ExecutionVersion != 2") &&
             workflow.Contains("proof.ProofSource != VerificationProofSource.OwnedProjectMetadata") &&
             workflow.Contains("proof.ProofVersion != 1") &&
-            !api.Contains("AddScoped<IExecutionEvidenceSource,") &&
-            !api.Contains("AddScoped<IExecutionVerificationAssessmentWriter,") &&
+            api.Contains("AddScoped<IExecutionEvidenceSource,") &&
+            api.Contains("AddScoped<IExecutionVerificationAssessmentWriter,") &&
             !api.Contains("AddScoped<IVerificationWorkflowService,") &&
             !writer.Contains("ExecuteUpdate") && !writer.Contains("while (") &&
             !writer.Contains("Task.Delay"),

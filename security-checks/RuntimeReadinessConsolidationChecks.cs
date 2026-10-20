@@ -132,11 +132,14 @@ internal static class RuntimeReadinessConsolidationChecks
             !source.Contains("AddScoped<IOwnershipSource", StringComparison.Ordinal),
             "12K normal startup does not register production ownership workflow");
         foreach (var contract in new[] { "IToolPermissionSource", "IActionExecutionStateStore", "IAuditEventSink",
-            "IExecutionReconciliationSource", "IExecutionEvidenceSource", "ITrustedToolExecutionService" })
+            "IExecutionReconciliationSource", "ITrustedToolExecutionService" })
             check(!source.Contains("AddScoped<" + contract, StringComparison.Ordinal) &&
                 !source.Contains("AddSingleton<" + contract, StringComparison.Ordinal) &&
                 !source.Contains("AddTransient<" + contract, StringComparison.Ordinal),
                 "12K no production startup registration: " + contract);
+        check(source.Contains("AddScoped<IExecutionEvidenceSource, OwnedProjectMetadataExecutionEvidenceSource>") &&
+            !source.Contains("AddScoped<IVerificationWorkflowService"),
+            "17U evidence source foundation does not activate verification workflow");
         check(!source.Contains("ToolExecutionEnabled = true", StringComparison.Ordinal) &&
             !source.Contains("SafeFileAccessEnabled = true", StringComparison.Ordinal) &&
             !source.Contains("CloudAiEnabled = true", StringComparison.Ordinal),

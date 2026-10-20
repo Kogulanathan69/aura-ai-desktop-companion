@@ -105,7 +105,7 @@ internal static class LiveVerificationMigrationApplication
         await db.Database.CloseConnectionAsync();
         await db.GetService<IMigrator>().MigrateAsync(TargetMigration, token);
         var after = (await db.Database.GetAppliedMigrationsAsync(token)).ToArray();
-        return after.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations[..^1]);
+        return after.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations[..^2]);
     }
 
     internal static bool MatchesIdentity(string database, uint actualOid, long actualSystem,
@@ -114,6 +114,8 @@ internal static class LiveVerificationMigrationApplication
         actualOid == expectedOid && actualSystem == expectedSystem;
 
     internal static bool MatchesPreMigrationState(string[] applied, string[] pending) =>
-        applied.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations[..^2]) &&
-        pending.Length == 1 && pending[0] == TargetMigration;
+        applied.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations[..^3]) &&
+        pending.Length == 3 && pending[0] == TargetMigration &&
+        pending[1] == LiveIndependentVerificationOutcomeMigrationApplication.TargetMigration &&
+        pending[2] == LiveProjectVersionMigrationApplication.TargetMigration;
 }

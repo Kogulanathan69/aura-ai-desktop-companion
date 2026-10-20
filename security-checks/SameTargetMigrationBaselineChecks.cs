@@ -20,7 +20,8 @@ internal static class SameTargetMigrationBaselineChecks
                 "20261014000003_AddSecurityAuditOutbox",
                 "20261014000004_HardenSecurityAuditOutboxDelivery",
                 "20261018000000_AddTrustedVerificationFoundation",
-                "20261019000000_AddIndependentVerificationOutcome"
+                "20261019000000_AddIndependentVerificationOutcome",
+                "20261019000001_AddProjectVersion"
             ]) &&
             Directory.GetFiles(Path.Combine(root, "Aura.Infrastructure", "Data", "Migrations"),
                 "*ModelSnapshot.cs").Length == 0,

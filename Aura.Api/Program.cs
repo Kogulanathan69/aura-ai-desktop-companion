@@ -30,6 +30,7 @@ using Aura.Api.Endpoints;
 using Aura.Api.Security;
 using Aura.Application.Security;
 using Aura.Application.Actions;
+using Aura.Application.Verifications;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -136,14 +137,21 @@ builder.Services.AddSingleton(runtimeSafetyOptions);
 builder.Services.AddSingleton<IRuntimeCapabilityReadiness>(runtimeReadiness);
 builder.Services.AddSingleton(runtimeSafetyValidator);
 
-// Database
-builder.Services.AddDbContext<AuraDbContext>(options =>
+// One Npgsql/pgvector configuration backs factory-created and scoped contexts.
+// AddDbContextFactory also supplies the scoped AuraDbContext used by existing services.
+builder.Services.AddDbContextFactory<AuraDbContext, AuraDbContextFactory>(options =>
     options.UseNpgsql(
         connectionString,
         npgsqlOptions => npgsqlOptions.UseVector()));
 
 builder.Services.AddScoped<IAuraDbContext>(provider =>
     provider.GetRequiredService<AuraDbContext>());
+
+// Independent verification persistence foundations. Workflow composition remains
+// gated until its ownership scope, tool registry and proof policy are reviewed.
+builder.Services.AddScoped<IExecutionEvidenceSource, OwnedProjectMetadataExecutionEvidenceSource>();
+builder.Services.AddScoped<IExecutionVerificationAssessmentWriter,
+    ExecutionVerificationAssessmentPersistenceWriter>();
 
 // Registration review is observational; execution also requires independent approval.
 var productionComposition = ProductionRuntimeCompositionInspector.Inspect(builder.Services);

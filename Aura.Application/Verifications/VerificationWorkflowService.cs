@@ -53,8 +53,10 @@ public sealed class VerificationWorkflowService(ToolRegistry tools, IVerificatio
                  proof.UpdatedAt == default ||
                  proof.ProofSource != VerificationProofSource.OwnedProjectMetadata ||
                  proof.ProofVersion != 1 ||
+                 proof.ProjectVersion <= 0 ||
                  execution.IndependentProof is not { } independent ||
                  independent.ProjectId != proof.ProjectId ||
+                 independent.ProjectVersion != proof.ProjectVersion ||
                  independent.ProjectUpdatedAt != proof.UpdatedAt ||
                  independent.ExecutionVersion != execution.ExecutionVersion ||
                  independent.ProofSource != VerificationProofSource.OwnedProjectMetadata ||

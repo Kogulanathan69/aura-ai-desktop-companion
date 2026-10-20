@@ -41,8 +41,10 @@ internal static class ProductionVerificationCompositionChecks
 
         var catalog = typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedVerification",
             BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) as IReadOnlySet<Type>;
-        check(catalog is { Count: 0 } && !Ready(new ServiceCollection()),
-            "14L reviewed catalog is empty and cannot replace matching DI");
+        check(catalog is { Count: 1 } &&
+            catalog.Contains(typeof(OwnedProjectMetadataExecutionEvidenceSource)) &&
+            !Ready(new ServiceCollection()),
+            "17U reviewed source alone cannot replace complete matching DI");
 
         var otherCapabilities = new ServiceCollection();
         otherCapabilities.AddScoped<IActionExecutionStateStore, ActionExecutionStatePersistenceStore>();
@@ -128,7 +130,7 @@ internal static class ProductionVerificationCompositionChecks
         check(flags.ProductionAdaptersEnabled && !Ready(new ServiceCollection()) &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().Verification,
             "14L flags and disposable live evidence cannot replace reviewed independent source");
-        check(!api.Contains("AddScoped<IExecutionEvidenceSource", StringComparison.Ordinal) &&
+        check(api.Contains("AddScoped<IExecutionEvidenceSource", StringComparison.Ordinal) &&
             !api.Contains("AddSingleton<IExecutionEvidenceSource", StringComparison.Ordinal) &&
             !api.Contains("AddTransient<IExecutionEvidenceSource", StringComparison.Ordinal) &&
             !api.Contains("UnavailableExecutionEvidenceSource", StringComparison.Ordinal) &&

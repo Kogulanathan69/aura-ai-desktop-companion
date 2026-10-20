@@ -18,7 +18,8 @@ internal static class ProductionMigrationBaselineEvidence
         "20261014000003_AddSecurityAuditOutbox",
         "20261014000004_HardenSecurityAuditOutboxDelivery",
         "20261018000000_AddTrustedVerificationFoundation",
-        "20261019000000_AddIndependentVerificationOutcome"
+        "20261019000000_AddIndependentVerificationOutcome",
+        "20261019000001_AddProjectVersion"
     ];
     internal const string HardenedDeliveryExpression =
         "(\"DeliveryState\" = 0 AND \"AttemptCount\" = 0 AND \"DeliveredAt\" IS NULL) OR " +
@@ -40,20 +41,22 @@ internal static class ProductionMigrationBaselineEvidence
     internal enum Stage
     {
         Passed, Connectivity, MissingHistory, DuplicateMigration, MissingMigration,
-        UnexpectedMigration, MigrationOrder, MissingTable, MissingColumn,
+        UnexpectedMigration, MigrationOrder, MissingTable, MissingColumn, MissingTrigger,
         IncompatibleColumn, MissingPrimaryKey, MissingForeignKey,
         MissingUniqueIndex, MissingCheckConstraint, IncompatibleConstraint,
         Unexpected
     }
 
     internal sealed record Column(string Table, string Name, string Type, bool Required,
-        int? MaxLength = null);
+        int? MaxLength = null, string? DefaultValue = null);
+    internal sealed record Trigger(string Name, string Definition, string FunctionDefinition);
     internal sealed record Constraint(string Table, string Name, char Kind,
         string? ReferencedTable, char DeleteAction, bool Validated, string Definition);
     internal sealed record Index(string Table, string Name, bool Unique, string Definition);
     internal sealed record Snapshot(bool HistoryExists, IReadOnlyList<string> History,
         IReadOnlySet<string> Tables, IReadOnlyList<Column> Columns,
-        IReadOnlyList<Constraint> Constraints, IReadOnlyList<Index> Indexes);
+        IReadOnlyList<Constraint> Constraints, IReadOnlyList<Index> Indexes,
+        IReadOnlyList<Trigger>? Triggers = null);
 
     internal static async Task<int> RunAsync(Func<string, string?> environment, Action<string> write,
         Func<string, CancellationToken, Task<Stage>>? execute = null,
@@ -93,7 +96,7 @@ internal static class ProductionMigrationBaselineEvidence
                 Stage.MissingPrimaryKey or Stage.MissingForeignKey or
                     Stage.MissingUniqueIndex or Stage.MissingCheckConstraint or
                     Stage.IncompatibleConstraint => "KEY CONSTRAINTS: FAIL",
-                Stage.MissingColumn or Stage.IncompatibleColumn => "SECURITY SCHEMA: FAIL",
+                Stage.MissingColumn or Stage.IncompatibleColumn or Stage.MissingTrigger => "SECURITY SCHEMA: FAIL",
                 _ => "RESULT: FAIL"
             });
             write("RESULT: FAIL");
@@ -146,10 +149,20 @@ internal static class ProductionMigrationBaselineEvidence
 
         var columns = new List<Column>();
         await ReadAsync(db, "SELECT table_name, column_name, udt_name, is_nullable, " +
-            "character_maximum_length FROM information_schema.columns " +
+            "character_maximum_length, column_default FROM information_schema.columns " +
             "WHERE table_schema = current_schema()",
             row => columns.Add(new(row.GetString(0), row.GetString(1), row.GetString(2),
-                row.GetString(3) == "NO", row.IsDBNull(4) ? null : row.GetInt32(4))), token);
+                row.GetString(3) == "NO", row.IsDBNull(4) ? null : row.GetInt32(4),
+                row.IsDBNull(5) ? null : row.GetString(5))), token);
+
+        var triggers = new List<Trigger>();
+        await ReadAsync(db, "SELECT trigger_row.tgname, pg_get_triggerdef(trigger_row.oid), " +
+            "pg_get_functiondef(trigger_row.tgfoid) FROM pg_catalog.pg_trigger trigger_row " +
+            "JOIN pg_catalog.pg_class relation ON relation.oid = trigger_row.tgrelid " +
+            "JOIN pg_catalog.pg_namespace namespace_row ON namespace_row.oid = relation.relnamespace " +
+            "WHERE namespace_row.nspname = current_schema() AND relation.relname = 'Projects' " +
+            "AND NOT trigger_row.tgisinternal AND trigger_row.tgenabled = 'O'",
+            row => triggers.Add(new(row.GetString(0), row.GetString(1), row.GetString(2))), token);
 
         var constraints = new List<Constraint>();
         await ReadAsync(db, "SELECT relation.relname, constraint_row.conname, " +
@@ -175,7 +188,7 @@ internal static class ProductionMigrationBaselineEvidence
             "WHERE namespace_row.nspname = current_schema()",
             row => indexes.Add(new(row.GetString(0), row.GetString(1),
                 row.GetBoolean(2), row.GetString(3))), token);
-        return new(historyExists, history, tables, columns, constraints, indexes);
+        return new(historyExists, history, tables, columns, constraints, indexes, triggers);
     }
 
     private static async Task ReadAsync(NpgsqlConnection db, string sql,
@@ -209,6 +222,20 @@ internal static class ProductionMigrationBaselineEvidence
                 (expected.MaxLength is not null && actual.MaxLength != expected.MaxLength))
                 return Stage.IncompatibleColumn;
         }
+        var projectVersion = snapshot.Columns.SingleOrDefault(x => x.Table == "Projects" &&
+            x.Name == "Version");
+        if (projectVersion is null || Compact(projectVersion.DefaultValue ?? "") != "1")
+            return Stage.IncompatibleColumn;
+        var versionTrigger = snapshot.Triggers?.SingleOrDefault(x =>
+            x.Name == "TR_Projects_IncrementVersion");
+        if (versionTrigger is null ||
+            !Compact(versionTrigger.Definition).Contains("beforeinsertorupdateon", StringComparison.Ordinal) ||
+            !Compact(versionTrigger.Definition).Contains("aura_increment_project_version", StringComparison.Ordinal) ||
+            !Compact(versionTrigger.FunctionDefinition).Contains("new.versionisdistinctfrom1", StringComparison.Ordinal) ||
+            !Compact(versionTrigger.FunctionDefinition).Contains("new.version:=old.version+1", StringComparison.Ordinal) ||
+            !Compact(versionTrigger.FunctionDefinition).Contains("new.versionisdistinctfromold.version", StringComparison.Ordinal) ||
+            !Compact(versionTrigger.FunctionDefinition).Contains("old.version=9223372036854775807", StringComparison.Ordinal))
+            return Stage.MissingTrigger;
         foreach (var (table, key) in PrimaryKeys)
         {
             var actual = snapshot.Constraints.FirstOrDefault(x => x.Table == table &&
@@ -292,6 +319,7 @@ internal static class ProductionMigrationBaselineEvidence
         new("Users", "Id", "uuid", true), new("Users", "AuthUserId", "uuid", true),
         new("Users", "IsActive", "bool", true),
         new("Projects", "Id", "uuid", true), new("Projects", "UserId", "uuid", true),
+        new("Projects", "Version", "int8", true, DefaultValue: "1"),
         new("Conversations", "Id", "uuid", true), new("Conversations", "UserId", "uuid", true),
         new("Conversations", "ProjectId", "uuid", false),
         new("Conversations", "Type", "varchar", true, 30),
@@ -437,6 +465,7 @@ internal static class ProductionMigrationBaselineEvidence
 
     internal static readonly (string Table, string Name, string[] Markers)[] CheckConstraints =
     [
+        ("Projects", "CK_Projects_Version_Positive", ["version>0"]),
         ("ToolPermissionGrants", "CK_ToolPermissionGrants_NonemptyIds", ["userid", "projectid"]),
         ("ToolPermissionGrants", "CK_ToolPermissionGrants_ToolId", ["toolid"]),
         ("ToolPermissionGrants", "CK_ToolPermissionGrants_RequiredPermission", ["requiredpermission", "0", "1", "2"]),

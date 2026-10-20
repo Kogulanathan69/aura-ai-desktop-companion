@@ -122,13 +122,13 @@ internal static class ProductionVerificationEvidenceChecks
                 typeof(IExecutionEvidenceSource).IsAssignableFrom(type)).ToArray();
         check(adapters.ToHashSet().SetEquals([typeof(UnavailableExecutionEvidenceSource),
                 typeof(Aura.Infrastructure.Services.OwnedProjectMetadataExecutionEvidenceSource)]) &&
-            !api.Contains("AddScoped<IExecutionEvidenceSource", StringComparison.Ordinal) &&
-            inspector.Contains("ReviewedVerification = new HashSet<Type>()") &&
+            api.Contains("AddScoped<IExecutionEvidenceSource", StringComparison.Ordinal) &&
+            inspector.Contains("ReviewedVerificationWorkflow = new HashSet<Type>()") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Verification &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().Verification &&
             !new RuntimeSafetyOptions().ProductionAdaptersEnabled &&
             !new RuntimeSafetyOptions().ToolExecutionEnabled,
-            "17P independent source is unregistered and cannot claim readiness");
+            "17U independent source is registered but incomplete workflow cannot claim readiness");
         check(typeof(ExecutionEvidenceInput).GetProperties().Any(x => x.Name == "ExecutionVersion") &&
             typeof(ExecutionEvidenceInput).GetProperties().Any(x => x.Name == "ProjectObservation") &&
             typeof(ExecutionVerificationAssessmentRecord).GetProperties().Any(x =>

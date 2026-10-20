@@ -24,7 +24,7 @@ internal static class IndependentVerificationAdapterChecks
             source.Contains("ExpectedTool = \"owned-project-metadata-read\"") &&
             source.Contains("IsolationLevel.RepeatableRead") &&
             source.Contains("AsNoTracking()") && source.Contains("x.Id == scope.ProjectId && x.UserId == scope.UserId") &&
-            source.Contains(".Select(x => new { x.Id, x.UpdatedAt })") &&
+            source.Contains(".Select(x => new { x.Id, x.Version, x.UpdatedAt })") &&
             !source.Contains("SaveChanges") && !source.Contains("ExecuteUpdate") &&
             !source.Contains("HttpClient") && !source.Contains("File.") &&
             !source.Contains("Task.Delay") && !source.Contains("while (") &&
@@ -68,13 +68,13 @@ internal static class IndependentVerificationAdapterChecks
             "17P pending migration changes only bounded Verified check constraint");
         check(writer.Contains("evidence.IndependentProof is not { } proof") &&
             writer.Contains("ProofSource = verified ? VerificationProofSource.OwnedProjectMetadata : VerificationProofSource.None") &&
-            !api.Contains("AddScoped<IExecutionEvidenceSource,") &&
-            !api.Contains("AddScoped<IExecutionVerificationAssessmentWriter,") &&
+            api.Contains("AddScoped<IExecutionEvidenceSource,") &&
+            api.Contains("AddScoped<IExecutionVerificationAssessmentWriter,") &&
             !api.Contains("AddScoped<IVerificationWorkflowService,") &&
             !api.Contains("MigrateAsync(") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Verification,
-            "17R proof-bound writer and production graph remain unregistered");
-        check(ProductionMigrationBaselineEvidence.ExpectedMigrations.Length == 7 &&
+            "17U proof-bound foundations do not imply complete verification graph");
+        check(ProductionMigrationBaselineEvidence.ExpectedMigrations.Length == 8 &&
             outcomeReview.Contains("OPERATOR-REPORTED LIVE RESULT: PASS") &&
             outcomeReview.Contains("Verification=false") &&
             outcomeReview.Contains("Verified writer path is incomplete"),

@@ -81,7 +81,8 @@ internal static class FinalProductionActivationGateChecks
             "20261014000003_AddSecurityAuditOutbox.cs",
             "20261014000004_HardenSecurityAuditOutboxDelivery.cs",
             "20261018000000_AddTrustedVerificationFoundation.cs",
-            "20261019000000_AddIndependentVerificationOutcome.cs" }),
+            "20261019000000_AddIndependentVerificationOutcome.cs",
+            "20261019000001_AddProjectVersion.cs" }),
             "17P six baseline sources plus pending Verified constraint source exist in order");
         check(Directory.GetFiles(migrationDirectory, "*ModelSnapshot.cs").Length == 0 &&
             evidenceDocs[5].Contains("historical core schema baseline is still unresolved",
@@ -106,7 +107,7 @@ internal static class FinalProductionActivationGateChecks
             "13L API uses unavailable startup readiness");
         foreach (var contract in new[] { "IToolPermissionSource", "IActionExecutionStateStore",
             "IAuditEventSink", "IAuditOutboxDispatcher", "IExecutionReconciliationSource",
-            "IExecutionEvidenceSource", "ITrustedToolExecutionService" })
+            "ITrustedToolExecutionService" })
             check(!program.Contains("AddScoped<" + contract, StringComparison.Ordinal) &&
                 !program.Contains("AddSingleton<" + contract, StringComparison.Ordinal) &&
                 !program.Contains("AddTransient<" + contract, StringComparison.Ordinal),
