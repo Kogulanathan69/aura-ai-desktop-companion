@@ -21,7 +21,10 @@ internal static class LiveIndependentVerificationEvidence
         "NEGATIVE TOOL BINDING", "NEGATIVE APPROVAL BINDING", "NEGATIVE EXECUTION BINDING",
         "STALE EXECUTION VERSION", "WRONG PROOF SOURCE", "WRONG PROOF VERSION",
         "MISSING PROOF", "FAILED EXECUTION", "REPEATED ASSESSMENT",
-        "CONCURRENT PROJECT UPDATE", "STATE IMMUTABILITY", "CLEANUP"];
+        "CONCURRENT PROJECT UPDATE", "STATE IMMUTABILITY", "CLEANUP",
+        "PROJECT VERSION INITIALIZATION", "PROJECT VERSION INCREMENT",
+        "STALE PROJECT VERSION REJECTION", "OVERLAPPING PROJECT UPDATE",
+        "FRESH PROJECT VERSION VERIFIED"];
 
     internal static async Task<int> RunAsync(Func<string, string?> environment, Action<string> write,
         Func<string, uint, long, CancellationToken, Task<bool[]>>? execute = null,
@@ -82,7 +85,14 @@ internal static class LiveIndependentVerificationEvidence
                 if (!result[0]) return result;
                 await reader.DisposeAsync();
                 var history = (await db.Database.GetAppliedMigrationsAsync(token)).ToArray();
-                result[1] = history.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations);
+                result[1] = history.SequenceEqual(ProductionMigrationBaselineEvidence.ExpectedMigrations) &&
+                    await ProductionMigrationBaselineEvidence.RunAsync(key => key switch
+                    {
+                        ProductionMigrationBaselineEvidence.EnableVariable => "true",
+                        ProductionMigrationBaselineEvidence.DisposableVariable => "true",
+                        ProductionMigrationBaselineEvidence.ConnectionVariable => connection,
+                        _ => null
+                    }, _ => { }, cancellationToken: token) == 0;
                 if (!result[1]) return result;
             }
             var first = await LiveAuditOutboxVerification.AddFixtureAsync(factory, fixtures, token,
@@ -101,7 +111,9 @@ internal static class LiveIndependentVerificationEvidence
             result[3] = observation is not null &&
                 observation.ProjectId == first.Project && observation.UpdatedAt.Kind == DateTimeKind.Utc;
             result[4] = proof is not null &&
-                proof.ProjectId == first.Project && proof.ProjectUpdatedAt == observation?.UpdatedAt;
+                proof.ProjectId == first.Project && proof.ProjectUpdatedAt == observation?.UpdatedAt &&
+                proof.ProjectVersion == observation?.ProjectVersion;
+            result[26] = proof?.ProjectVersion == 1;
             result[5] = input?.Outcome == ExecutionReportOutcome.Succeeded &&
                 input.IndependentProof is not null; // Source has no handler-result argument.
             result[6] = input?.ExecutionVersion == 2 && proof?.ExecutionVersion == 2;
@@ -146,8 +158,10 @@ internal static class LiveIndependentVerificationEvidence
             result[22] = repeated.Id.Value != evidence.Id.Value &&
                 await writer.WriteAsync(repeated, 2, token) &&
                 await AssessmentMatchesAsync(factory, repeated.Id.Value, first, token);
-            result[23] = await UpdatedProjectProofAsync(factory, source, writer, input,
+            var versionResults = await UpdatedProjectProofAsync(factory, source, writer, input,
                 first, assessmentIds, token);
+            result[23] = versionResults.All(x => x);
+            for (var i = 0; i < versionResults.Length; i++) result[27 + i] = versionResults[i];
             await using (var db = await factory.CreateDbContextAsync(token))
             {
                 var state = await db.ActionExecutionStates.AsNoTracking().SingleAsync(x =>
@@ -183,7 +197,7 @@ internal static class LiveIndependentVerificationEvidence
         catch (InvalidOperationException) { return true; }
     }
 
-    private static async Task<bool> UpdatedProjectProofAsync(
+    private static async Task<bool[]> UpdatedProjectProofAsync(
         IDbContextFactory<AuraDbContext> factory,
         OwnedProjectMetadataExecutionEvidenceSource source,
         ExecutionVerificationAssessmentPersistenceWriter writer,
@@ -191,31 +205,47 @@ internal static class LiveIndependentVerificationEvidence
         LiveAuditOutboxVerification.Fixture fixture, List<Guid> assessmentIds,
         CancellationToken token)
     {
-        var updatedAt = DateTime.UtcNow.AddSeconds(-1);
-        if (updatedAt == original.IndependentProof!.ProjectUpdatedAt)
-            updatedAt = updatedAt.AddSeconds(-1);
+        var checks = new bool[4];
+        // Keep UpdatedAt unchanged: stale rejection must be caused by Version.
+        await using var observer = await factory.CreateDbContextAsync(token);
+        await using var observationTransaction = await observer.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.RepeatableRead, token);
+        var oldVersion = await observer.Projects.AsNoTracking().Where(x => x.Id == fixture.Project)
+            .Select(x => x.Version).SingleAsync(token);
+        if (oldVersion != original.IndependentProof.ProjectVersion) return checks;
         await using (var db = await factory.CreateDbContextAsync(token))
         {
             var changed = await db.Projects.Where(x => x.Id == fixture.Project &&
                 x.UserId == fixture.User).ExecuteUpdateAsync(s => s
-                    .SetProperty(x => x.Name, "aura-verification-updated")
-                    .SetProperty(x => x.UpdatedAt, updatedAt), token);
-            if (changed != 1) return false;
+                    .SetProperty(x => x.Name, "aura-verification-updated"), token);
+            if (changed != 1) return checks;
         }
+        await using (var db = await factory.CreateDbContextAsync(token))
+            checks[0] = await db.Projects.AsNoTracking().Where(x => x.Id == fixture.Project)
+                .Select(x => x.Version).SingleAsync(token) == oldVersion + 1;
+        if (!checks[0]) return checks;
         var stale = VerificationEvidence.Issue(original, VerificationOutcome.Verified, DateTime.UtcNow);
         assessmentIds.Add(stale.Id.Value);
-        if (await writer.WriteAsync(stale, 2, token)) return false;
+        if (await writer.WriteAsync(stale, 2, token)) return checks;
         await using (var db = await factory.CreateDbContextAsync(token))
-            if (await db.ExecutionVerificationAssessments.AsNoTracking()
-                .AnyAsync(x => x.Id == stale.Id.Value, token)) return false;
+            checks[1] = !await db.ExecutionVerificationAssessments.AsNoTracking()
+                .AnyAsync(x => x.Id == stale.Id.Value, token);
+        if (!checks[1]) return checks;
+        checks[2] = await observer.Projects.AsNoTracking().Where(x => x.Id == fixture.Project)
+            .Select(x => x.Version).SingleAsync(token) == oldVersion;
+        await observationTransaction.CommitAsync(token);
+        if (!checks[2]) return checks;
         var fresh = await source.GetAsync(original.Scope, original.ActionId, original.ExecutionId, token);
-        if (fresh?.IndependentProof is not { } proof || proof.ProjectUpdatedAt != updatedAt ||
-            proof.ProjectUpdatedAt == original.IndependentProof.ProjectUpdatedAt)
-            return false;
+        if (fresh?.IndependentProof is not { } proof ||
+            proof.ProjectUpdatedAt != original.IndependentProof!.ProjectUpdatedAt ||
+            proof.ProjectVersion != oldVersion + 1 ||
+            fresh.ProjectObservation?.ProjectVersion != proof.ProjectVersion)
+            return checks;
         var current = VerificationEvidence.Issue(fresh, VerificationOutcome.Verified, DateTime.UtcNow);
         assessmentIds.Add(current.Id.Value);
-        return await writer.WriteAsync(current, 2, token) &&
+        checks[3] = await writer.WriteAsync(current, 2, token) &&
             await AssessmentMatchesAsync(factory, current.Id.Value, fixture, token);
+        return checks;
     }
 
     private static async Task<bool> CompleteAsync(IDbContextFactory<AuraDbContext> factory,

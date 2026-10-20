@@ -36,9 +36,9 @@ internal static class VerificationChecks
         {
             ExecutionVersion = 2,
             ProjectObservation = new(scope.ProjectId, clock.UtcNow,
-                VerificationProofSource.OwnedProjectMetadata, 1),
+                VerificationProofSource.OwnedProjectMetadata, 1, 1),
             IndependentProof = OwnedProjectMetadataProof.FromAuthoritativeRead(
-                scope.ProjectId, clock.UtcNow, 2)
+                scope.ProjectId, clock.UtcNow, 2, 1)
         };
         var source = new SourceFixture { Input = input };
         var proof = new ProofFixture();
@@ -126,6 +126,7 @@ internal static class VerificationChecks
             input with { IndependentProof = null },
             input with { ProjectObservation = null },
             input with { ProjectObservation = input.ProjectObservation! with { ProjectId = Guid.NewGuid() } },
+            input with { ProjectObservation = input.ProjectObservation! with { ProjectVersion = 2 } },
             input with { ProjectObservation = input.ProjectObservation! with { ProofSource = VerificationProofSource.None } },
             input with { ProjectObservation = input.ProjectObservation! with { ProofVersion = 0 } }
         })

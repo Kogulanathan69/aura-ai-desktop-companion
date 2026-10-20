@@ -34,8 +34,8 @@ internal static class VerificationConcurrencyAndRegistrationChecks
             "17S writer retains terminal exact binding and no execution mutation or retry");
         check(harness.Contains("CONCURRENT PROJECT UPDATE", StringComparison.Ordinal) &&
             harness.Contains("UpdatedProjectProofAsync", StringComparison.Ordinal) &&
-            harness.Contains("if (await writer.WriteAsync(stale, 2, token)) return false", StringComparison.Ordinal) &&
-            harness.Contains("await writer.WriteAsync(current, 2, token)", StringComparison.Ordinal) &&
+            harness.Contains("if (await writer.WriteAsync(stale, 2, token)) return checks", StringComparison.Ordinal) &&
+            harness.Contains("checks[3] = await writer.WriteAsync(current, 2, token)", StringComparison.Ordinal) &&
             harness.Contains("result[25] = rowsGone && fixturesGone", StringComparison.Ordinal),
             "17S live category demands stale rejection, fresh persistence and cleanup");
         check(review.Contains("PASS for all 26 categories", StringComparison.Ordinal) &&
@@ -46,9 +46,9 @@ internal static class VerificationConcurrencyAndRegistrationChecks
             "17S records bounded operator-reported same-target 26-category PASS");
         check(project.Contains("project.UpdatedAt = _dateTimeProvider.UtcNow", StringComparison.Ordinal) &&
             configuration.Contains("builder.Property(x => x.UpdatedAt)", StringComparison.Ordinal) &&
-            !configuration.Contains("IsConcurrencyToken", StringComparison.Ordinal) &&
+            configuration.Contains("IsConcurrencyToken", StringComparison.Ordinal) &&
             review.Contains("not a database-managed monotonic version", StringComparison.Ordinal),
-            "17S does not mistake required UpdatedAt for guaranteed unique row version");
+            "17S timestamp limitation is addressed by subsequent project version configuration");
         check(workflow.Contains("IIndependentVerificationPolicy policy", StringComparison.Ordinal) &&
             workflow.Contains("ToolRegistry tools", StringComparison.Ordinal) &&
             !workflow.Contains("IExecutionVerificationAssessmentWriter", StringComparison.Ordinal) &&
@@ -76,17 +76,17 @@ internal static class VerificationConcurrencyAndRegistrationChecks
             inspector.Contains("ServiceLifetime.Scoped", StringComparison.Ordinal) &&
             inspector.Contains("ServiceLifetime.Singleton", StringComparison.Ordinal),
             "17S inspector requires unique scoped source/writer/workflow and reviewed factory");
-        check(inspector.Contains("ReviewedVerification = new HashSet<Type>()", StringComparison.Ordinal) &&
-            inspector.Contains("ReviewedVerificationWriter = new HashSet<Type>()", StringComparison.Ordinal) &&
+        check(inspector.Contains("typeof(OwnedProjectMetadataExecutionEvidenceSource)", StringComparison.Ordinal) &&
+            inspector.Contains("typeof(ExecutionVerificationAssessmentPersistenceWriter)", StringComparison.Ordinal) &&
             inspector.Contains("ReviewedVerificationWorkflow = new HashSet<Type>()", StringComparison.Ordinal) &&
-            inspector.Contains("ReviewedVerificationFactory = new HashSet<Type>()", StringComparison.Ordinal) &&
+            inspector.Contains("typeof(AuraDbContextFactory)", StringComparison.Ordinal) &&
             !inspector.Contains("Assembly.GetTypes", StringComparison.Ordinal),
-            "17S catalogs remain exact and empty pending live concurrency evidence");
-        check(!api.Contains("AddScoped<IExecutionEvidenceSource", StringComparison.Ordinal) &&
-            !api.Contains("AddScoped<IExecutionVerificationAssessmentWriter", StringComparison.Ordinal) &&
+            "17U reviewed foundations are exact while workflow remains uncataloged");
+        check(api.Contains("AddScoped<IExecutionEvidenceSource", StringComparison.Ordinal) &&
+            api.Contains("AddScoped<IExecutionVerificationAssessmentWriter", StringComparison.Ordinal) &&
             !api.Contains("AddScoped<IVerificationWorkflowService", StringComparison.Ordinal) &&
-            !api.Contains("AddDbContextFactory<AuraDbContext>", StringComparison.Ordinal),
-            "17S production graph remains unregistered until concurrency PASS");
+            api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>", StringComparison.Ordinal),
+            "17U source, writer and factory do not imply workflow readiness");
         var flags = new RuntimeSafetyOptions();
         var composition = ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection());
         check(!composition.Verification && !composition.ToolHandlers &&

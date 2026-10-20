@@ -213,9 +213,9 @@ internal static class AuditWorkflowChecks
         {
             ExecutionVersion = 2,
             ProjectObservation = new(scope.ProjectId, clock.UtcNow,
-                Aura.Domain.Entities.VerificationProofSource.OwnedProjectMetadata, 1),
+                Aura.Domain.Entities.VerificationProofSource.OwnedProjectMetadata, 1, 1),
             IndependentProof = OwnedProjectMetadataProof.FromAuthoritativeRead(
-                scope.ProjectId, clock.UtcNow, 2)
+                scope.ProjectId, clock.UtcNow, 2, 1)
         });
         var proof = new Proof();
         foreach (var (verificationOutcome, auditOutcome) in new[]

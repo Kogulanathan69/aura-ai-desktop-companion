@@ -12,21 +12,22 @@ internal static class VerifiedIndependentProofWriterChecks
         var proofType = typeof(OwnedProjectMetadataProof);
         check(proofType.IsSealed && proofType.GetConstructors(BindingFlags.Public | BindingFlags.Instance).Length == 0 &&
             proofType.GetProperties().All(p => p.SetMethod is null), "independent proof is sealed and caller immutable");
-        check(OwnedProjectMetadataProof.FromAuthoritativeRead(Guid.Empty, DateTime.UtcNow, 2) is null &&
-            OwnedProjectMetadataProof.FromAuthoritativeRead(Guid.NewGuid(), DateTime.UtcNow, 1) is null &&
-            OwnedProjectMetadataProof.FromAuthoritativeRead(Guid.NewGuid(), DateTime.Now, 2) is null,
+        check(OwnedProjectMetadataProof.FromAuthoritativeRead(Guid.Empty, DateTime.UtcNow, 2, 1) is null &&
+            OwnedProjectMetadataProof.FromAuthoritativeRead(Guid.NewGuid(), DateTime.UtcNow, 1, 1) is null &&
+            OwnedProjectMetadataProof.FromAuthoritativeRead(Guid.NewGuid(), DateTime.Now, 2, 1) is null &&
+            OwnedProjectMetadataProof.FromAuthoritativeRead(Guid.NewGuid(), DateTime.UtcNow, 2, 0) is null,
             "independent proof rejects invalid project, version, and clock");
         var user = Guid.NewGuid(); var conversation = Guid.NewGuid(); var project = Guid.NewGuid();
         var action = ActionIdentifier.RestoreTrusted(Guid.NewGuid());
         ToolIdentifier.TryCreate("owned-project-metadata-read", out var tool);
         var completed = DateTime.UtcNow.AddSeconds(-1);
-        var proof = OwnedProjectMetadataProof.FromAuthoritativeRead(project, completed, 2);
+        var proof = OwnedProjectMetadataProof.FromAuthoritativeRead(project, completed, 2, 1);
         var input = new ExecutionEvidenceInput(Guid.NewGuid(), action,
             new ActionScope(user, conversation, project), tool!, Guid.NewGuid(),
             ExecutionReportOutcome.Succeeded, completed)
         {
             ExecutionVersion = 2, IndependentProof = proof,
-            ProjectObservation = new(project, completed, VerificationProofSource.OwnedProjectMetadata, 1)
+            ProjectObservation = new(project, completed, VerificationProofSource.OwnedProjectMetadata, 1, 1)
         };
         var evidence = VerificationEvidence.Issue(input, VerificationOutcome.Verified, DateTime.UtcNow);
         check(evidence.IndependentProof == proof && evidence.ExecutionVersion == 2 &&
@@ -35,6 +36,7 @@ internal static class VerifiedIndependentProofWriterChecks
             "issued Verified evidence retains immutable proof and exact binding");
         check(Reject(input with { IndependentProof = null }) &&
             Reject(input with { ExecutionVersion = 1 }) &&
+            Reject(input with { ProjectObservation = input.ProjectObservation! with { ProjectVersion = 2 } }) &&
             Reject(input with { Scope = new(user, conversation, Guid.NewGuid()) }) &&
             Reject(input with { Outcome = ExecutionReportOutcome.Failed }),
             "missing, stale, cross-project, or failed proof cannot issue Verified");
@@ -61,9 +63,10 @@ internal static class VerifiedIndependentProofWriterChecks
             writer.Contains("VerificationProofSource.None") && writer.Contains("ProofVersion = verified ? 1 : 0"),
             "writer retains advisory assessment path");
         var api = Read("Aura.Api", "Program.cs");
-        check(!api.Contains("AddScoped<IExecutionEvidenceSource, OwnedProjectMetadataExecutionEvidenceSource>") &&
-            !api.Contains("AddScoped<IExecutionVerificationAssessmentWriter, ExecutionVerificationAssessmentPersistenceWriter>"),
-            "production proof and writer graph remains unregistered");
+        check(api.Contains("AddScoped<IExecutionEvidenceSource, OwnedProjectMetadataExecutionEvidenceSource>") &&
+            api.Contains("AddScoped<IExecutionVerificationAssessmentWriter,") &&
+            !api.Contains("AddScoped<IVerificationWorkflowService"),
+            "production source and writer foundations are registered without incomplete workflow");
         var skipped = await LiveIndependentVerificationEvidence.RunAsync(_ => null, _ => { });
         check(skipped == 2, "live harness requires explicit environment gates");
         var local = "Host=127.0.0.1;Port=5433;Database=aura_disposable_test;Username=test;SSL Mode=Disable";
@@ -94,9 +97,9 @@ internal static class VerifiedIndependentProofWriterChecks
             review.Contains("does not serialize a concurrent project update", StringComparison.Ordinal) &&
             review.Contains("Verification readiness: false", StringComparison.Ordinal),
             "17R distinguishes observed stale-version denial from unresolved concurrent update");
-        check(inspector.Contains("ReviewedVerification = new HashSet<Type>()", StringComparison.Ordinal) &&
-            !api.Contains("AddScoped<IExecutionEvidenceSource", StringComparison.Ordinal) &&
-            !api.Contains("AddScoped<IExecutionVerificationAssessmentWriter", StringComparison.Ordinal) &&
+        check(inspector.Contains("ReviewedVerificationWorkflow = new HashSet<Type>()", StringComparison.Ordinal) &&
+            api.Contains("AddScoped<IExecutionEvidenceSource", StringComparison.Ordinal) &&
+            api.Contains("AddScoped<IExecutionVerificationAssessmentWriter", StringComparison.Ordinal) &&
             !api.Contains("AddScoped<IVerificationWorkflowService", StringComparison.Ordinal) &&
             !ProductionRuntimeCompositionInspector.Inspect(new Microsoft.Extensions.DependencyInjection.ServiceCollection())
                 .Verification &&

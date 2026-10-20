@@ -27,10 +27,10 @@ public sealed record ExecutionEvidenceInput(Guid ExecutionId, ActionIdentifier A
     public OwnedProjectMetadataProof? IndependentProof { get; init; }
 }
 
-// Project identity and one already persisted, bounded timestamp. No path, description,
+// Project identity, database version and bounded timestamp. No path, description,
 // repository URL, file content, metadata dictionary or handler response.
 public sealed record OwnedProjectMetadataObservation(Guid ProjectId, DateTime UpdatedAt,
-    VerificationProofSource ProofSource, int ProofVersion);
+    VerificationProofSource ProofSource, int ProofVersion, long ProjectVersion);
 
 public interface IExecutionEvidenceSource
 {
@@ -119,6 +119,10 @@ public sealed class VerificationEvidence
             (execution.Outcome != ExecutionReportOutcome.Succeeded ||
              execution.ExecutionVersion != 2 || execution.IndependentProof is not { } proof ||
              proof.ProjectId != execution.Scope.ProjectId ||
+             proof.ProjectVersion <= 0 ||
+             execution.ProjectObservation is not { } observed ||
+             observed.ProjectId != proof.ProjectId ||
+             observed.ProjectVersion != proof.ProjectVersion ||
              proof.ExecutionVersion != execution.ExecutionVersion ||
              execution.ToolId.Value != "owned-project-metadata-read"))
             throw new InvalidOperationException("Invalid verification issuance.");

@@ -46,6 +46,13 @@ if (args.Length == 1 && args[0] == LiveIndependentVerificationOutcomeMigrationAp
     return;
 }
 
+if (args.Length == 1 && args[0] == LiveProjectVersionMigrationApplication.Command)
+{
+    Environment.ExitCode = await LiveProjectVersionMigrationApplication.RunAsync(
+        Environment.GetEnvironmentVariable, Console.WriteLine);
+    return;
+}
+
 if (args.Length == 1 && args[0] == LiveIndependentVerificationEvidence.Command)
 {
     Environment.ExitCode = await LiveIndependentVerificationEvidence.RunAsync(
@@ -174,6 +181,8 @@ await OwnershipRuntimeRegistrationChecks.RunAsync(Check);
 await LiveOwnershipVerificationChecks.RunAsync(Check);
 await ProductionOwnershipEvidenceChecks.RunAsync(Check);
 await ProductionMigrationBaselineEvidenceChecks.RunAsync(Check);
+await ProjectVersionConcurrencyChecks.RunAsync(Check);
+await VerificationProductionRegistrationChecks.RunAsync(Check);
 await SameTargetMigrationBaselineChecks.RunAsync(Check);
 await VerificationMigrationBaselineRefreshChecks.RunAsync(Check);
 await IndependentVerificationAdapterChecks.RunAsync(Check);

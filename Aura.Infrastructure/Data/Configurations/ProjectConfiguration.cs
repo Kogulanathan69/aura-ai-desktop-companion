@@ -41,6 +41,12 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(x => x.UpdatedAt)
             .IsRequired();
 
+        builder.Property(x => x.Version)
+            .HasDefaultValue(1L)
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken()
+            .IsRequired();
+
         builder.Property(x => x.LastOpenedAt)
             .IsRequired(false);
 

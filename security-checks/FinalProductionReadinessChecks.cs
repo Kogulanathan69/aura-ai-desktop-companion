@@ -128,7 +128,7 @@ internal static class FinalProductionReadinessChecks
         check(!program.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal),
             "12L ownership helper is not invoked by normal startup");
         foreach (var contract in new[] { "IToolPermissionSource", "IActionExecutionStateStore",
-            "IAuditEventSink", "IExecutionReconciliationSource", "IExecutionEvidenceSource",
+            "IAuditEventSink", "IExecutionReconciliationSource",
             "ITrustedToolExecutionService" })
             check(!program.Contains("AddScoped<" + contract, StringComparison.Ordinal) &&
                 !program.Contains("AddSingleton<" + contract, StringComparison.Ordinal) &&

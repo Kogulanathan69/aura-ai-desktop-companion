@@ -66,14 +66,14 @@ internal static class TrustedTargetVerificationFoundationChecks
         check(!api.Contains("AddScoped<IToolHandler,") &&
             !api.Contains("AddScoped<IToolExecutionPolicy,") &&
             !api.Contains("AddScoped<ITrustedToolExecutionService,") &&
-            !api.Contains("AddScoped<IExecutionEvidenceSource,") &&
-            !api.Contains("AddScoped<IExecutionVerificationAssessmentWriter,") &&
+            api.Contains("AddScoped<IExecutionEvidenceSource,") &&
+            api.Contains("AddScoped<IExecutionVerificationAssessmentWriter,") &&
             !snapshot.Verification && !snapshot.ToolHandlers && !snapshot.ExecutionPolicy &&
             !snapshot.TrustedExecution && !snapshot.CompositionComplete &&
             !flags.ProductionAdaptersEnabled && !flags.ToolExecutionEnabled &&
             !flags.AuditPersistenceEnabled && !flags.SafeFileAccessEnabled && !flags.CloudAiEnabled &&
             !new UnavailableFinalProductionSecurityApprovalSource().IsApproved,
-            "17N no production adapter, handler, policy, trusted service or activation");
+            "17U verification foundations do not register handler, policy, trusted service or activation");
         return Task.CompletedTask;
     }
 }

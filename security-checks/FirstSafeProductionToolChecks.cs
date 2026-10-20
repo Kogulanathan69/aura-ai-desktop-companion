@@ -70,12 +70,12 @@ internal static class FirstSafeProductionToolChecks
             "17M descriptor, approval, ownership and permission cannot bypass deny policy");
 
         check(!api.Contains("AddScoped<IToolHandler,") &&
-            !api.Contains("AddScoped<IExecutionEvidenceSource,") &&
+            api.Contains("AddScoped<IExecutionEvidenceSource, OwnedProjectMetadataExecutionEvidenceSource>") &&
             !api.Contains("AddScoped<IToolExecutionPolicy,") &&
             !api.Contains("AddScoped<ITrustedToolExecutionService,") &&
             !api.Contains("AddHostedService") &&
             inspector.Contains("ReviewedToolHandlers =") &&
-            inspector.Contains("ReviewedVerification = new HashSet<Type>()") &&
+            inspector.Contains("ReviewedVerificationWorkflow = new HashSet<Type>()") &&
             inspector.Contains("ReviewedExecutionPolicy = new HashSet<Type>()"),
             "17M no candidate handler, proof source or allowing policy enters production DI/catalog");
         var snapshot = ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection());

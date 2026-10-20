@@ -24,14 +24,14 @@ internal static class DbBackedProductionRegistrationChecks
             review.Contains("operator-attested") &&
             review.Contains("partially unresolved"),
             "17L reuses bounded live baseline without inventing core-schema provenance");
-        check(api.Contains("AddDbContext<AuraDbContext>(") &&
+        check(!api.Contains("AddDbContext<AuraDbContext>(") &&
             api.Contains("AddScoped<IAuraDbContext>(provider =>") &&
             api.Contains("provider.GetRequiredService<AuraDbContext>()") &&
-            !api.Contains("AddDbContextFactory<AuraDbContext>(") &&
+            api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>(") &&
             !api.Contains("AddPooledDbContextFactory<AuraDbContext>(") &&
             !api.Contains("MigrateAsync(") && !api.Contains("EnsureCreated(") &&
             !api.Contains("AddHostedService"),
-            "17L one existing scoped DbContext graph and no startup mutation or worker");
+            "17U one shared factory/scoped context graph and no startup mutation or worker");
         check(state.Contains("IDbContextFactory<AuraDbContext> factory") &&
             state.Contains("db.ActionExecutionStates.Add(row)") &&
             !state.Contains("db.ActionApprovals.AsNoTracking()") &&
@@ -57,7 +57,7 @@ internal static class DbBackedProductionRegistrationChecks
             "IAuditEventSink", "IAuditOutboxDispatcher", "IOwnershipSource",
             "IToolExecutionScopeValidator", "IToolPermissionSource" };
         check(blockedContracts.All(contract => !api.Contains($"AddScoped<{contract},", StringComparison.Ordinal)) &&
-            !api.Contains("AddDbContextFactory<AuraDbContext>(") &&
+            api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>(") &&
             review.Contains("No production registrations or catalog entries were added"),
             "17L unresolved capabilities have no premature normal-startup registration");
         check(new[] { "ReviewedOwnershipContext", "ReviewedSubjectMapping", "ReviewedOwnershipSource",

@@ -4,6 +4,7 @@ using Aura.Application.AI.Providers;
 using Aura.Application.ProjectFiles.Content;
 using Aura.Application.Security;
 using Aura.Infrastructure.AI.OpenAI;
+using Aura.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 // Review-only formula. No production activation service or approval signal exists.
@@ -104,7 +105,7 @@ internal static class FinalProductionCompositionGateChecks
         var catalogNames = new[] { "ReviewedOwnershipContext", "ReviewedSubjectMapping",
             "ReviewedOwnershipSource", "ReviewedOwnershipValidator", "ReviewedPermission",
             "ReviewedExecutionState", "ReviewedAuditSink", "ReviewedAuditDelivery",
-            "ReviewedReconciliation", "ReviewedVerification", "ReviewedExecutionPolicy",
+            "ReviewedReconciliation", "ReviewedExecutionPolicy",
             "ReviewedToolHandlers", "ReviewedTrustedExecution" };
         foreach (var name in catalogNames)
         {
@@ -114,6 +115,10 @@ internal static class FinalProductionCompositionGateChecks
                 catalog?.GetType().GetProperty("Count")?.GetValue(catalog) is 0,
                 "14P reviewed production catalog remains intentionally empty: " + name);
         }
+        check(typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedVerification",
+                BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) is IReadOnlySet<Type> sources &&
+            sources.SetEquals([typeof(OwnedProjectMetadataExecutionEvidenceSource)]),
+            "17U source catalog is exact while full verification remains incomplete");
 
         var root = Directory.GetCurrentDirectory();
         string Read(params string[] parts) => File.ReadAllText(Path.Combine([root, .. parts]));
@@ -136,7 +141,7 @@ internal static class FinalProductionCompositionGateChecks
             "14P normal API still uses unavailable runtime readiness and fail-closed safety validation");
         foreach (var contract in new[] { "IToolPermissionSource", "IActionExecutionStateStore",
             "IAuditEventSink", "IAuditOutboxDispatcher", "IExecutionReconciliationSource",
-            "IExecutionEvidenceSource", "IToolExecutionPolicy", "IToolHandler",
+            "IToolExecutionPolicy", "IToolHandler",
             "ITrustedToolExecutionService" })
             check(!api.Contains("AddScoped<" + contract, StringComparison.Ordinal) &&
                 !api.Contains("AddSingleton<" + contract, StringComparison.Ordinal) &&

@@ -40,12 +40,12 @@ internal static class ProductionExecutionStateRegistrationChecks
         check(catalog is { Count: 0 } &&
             inspector.Contains("ReviewedExecutionState = new HashSet<Type>()", StringComparison.Ordinal),
             "17A unreviewed evidence cannot enter the exact production catalog");
-        check(!api.Contains("AddDbContextFactory<AuraDbContext>", StringComparison.Ordinal) &&
+        check(api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>", StringComparison.Ordinal) &&
             !api.Contains("AddPooledDbContextFactory<AuraDbContext>", StringComparison.Ordinal) &&
             !api.Contains("IActionExecutionStateStore", StringComparison.Ordinal) &&
-            api.Contains("AddDbContext<AuraDbContext>", StringComparison.Ordinal) &&
+            !api.Contains("AddDbContext<AuraDbContext>", StringComparison.Ordinal) &&
             api.Contains("AddScoped<IAuraDbContext>", StringComparison.Ordinal),
-            "17A normal startup leaves factory and state store unregistered pending evidence");
+            "17U shared factory exists while execution state store stays unregistered");
         check(inspector.Contains("registrations.Length == 1", StringComparison.Ordinal) &&
             inspector.Contains("registrations[0].Lifetime == ServiceLifetime.Scoped", StringComparison.Ordinal) &&
             inspector.Contains("ImplementationType == typeof(ActionExecutionStatePersistenceStore)",

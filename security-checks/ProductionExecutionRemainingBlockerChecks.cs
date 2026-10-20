@@ -25,9 +25,9 @@ internal static class ProductionExecutionRemainingBlockerChecks
             !contracts.Contains("ProofVersion { get; }") &&
             workflow.Contains("executions.GetAsync(scope, action.Id, request.ExecutionId, cancellationToken)") &&
             !workflow.Contains("SaveChangesAsync") &&
-            !api.Contains("AddScoped<IExecutionEvidenceSource") &&
+            api.Contains("AddScoped<IExecutionEvidenceSource") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Verification,
-            "16G no independent proof adapter/version binding or production verification registration exists");
+            "17U independent proof source exists but production verification remains incomplete");
         return Task.CompletedTask;
     }
 

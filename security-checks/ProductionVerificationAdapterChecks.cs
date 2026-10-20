@@ -15,10 +15,10 @@ internal static class ProductionVerificationAdapterChecks
         check(typeof(IExecutionEvidenceSource).IsAssignableFrom(
                 typeof(UnavailableExecutionEvidenceSource)) &&
             review.Contains("ProofSource=None") && review.Contains("ProofVersion=0") &&
-            !api.Contains("AddScoped<IExecutionEvidenceSource") &&
-            inspector.Contains("ReviewedVerification = new HashSet<Type>()") &&
+            api.Contains("AddScoped<IExecutionEvidenceSource, OwnedProjectMetadataExecutionEvidenceSource>") &&
+            inspector.Contains("ReviewedVerificationWorkflow = new HashSet<Type>()") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Verification,
-            "17G unavailable source and missing independent proof cannot assert verification");
+            "17U source registration alone cannot assert verification");
         return Task.CompletedTask;
     }
 }
