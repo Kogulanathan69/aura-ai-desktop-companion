@@ -139,7 +139,7 @@ internal static class ProductionToolHandlersEvidenceChecks
             !registrySource.Contains("Plugin") && !api.Contains("Assembly.Load"),
             "15I explicit registry has no unknown-tool fallback or production plugin discovery");
         check(execution.Contains("ApprovalValidation.IsBoundToApprovedAction") &&
-            execution.Contains("scopes.ValidateAsync(scope, cancellationToken)") &&
+            execution.Contains("scopes.ValidateActionAsync(exactAction, cancellationToken)") &&
             execution.Contains("permissions.HasPermissionAsync(scope, tool, cancellationToken)") &&
             execution.Contains("policy.AllowsAsync(tool, cancellationToken)") &&
             execution.Contains("states.TryReserveInitialAsync(ready, attempt, cancellationToken)") &&

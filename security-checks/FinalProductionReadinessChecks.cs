@@ -125,7 +125,7 @@ internal static class FinalProductionReadinessChecks
         check(program.Contains("new UnavailableRuntimeCapabilityReadiness()", StringComparison.Ordinal) &&
             !program.Contains("new PersistenceCapabilityReadiness()", StringComparison.Ordinal),
             "12L normal startup uses unavailable readiness, not informational snapshot");
-        check(!program.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal),
+        check(program.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal),
             "12L ownership helper is not invoked by normal startup");
         foreach (var contract in new[] { "IToolPermissionSource", "IActionExecutionStateStore",
             "IAuditEventSink", "IExecutionReconciliationSource",

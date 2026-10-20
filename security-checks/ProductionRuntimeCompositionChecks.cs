@@ -66,7 +66,7 @@ internal static class ProductionRuntimeCompositionChecks
             api.Contains("ProductionRuntimeCompositionInspector.Inspect(builder.Services)", StringComparison.Ordinal) &&
             !api.Contains("new PersistenceCapabilityReadiness()", StringComparison.Ordinal),
             "14E API observes composition but retains unavailable runtime readiness");
-        check(!api.Contains("AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
+        check(api.Contains("AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
             !api.Contains("AddScoped<ITrustedToolExecutionService", StringComparison.Ordinal) &&
             !api.Contains("AddScoped<IAuditOutboxDispatcher", StringComparison.Ordinal) &&
             !api.Contains("MigrateAsync(", StringComparison.Ordinal) &&

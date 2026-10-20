@@ -186,6 +186,8 @@ internal static class ApprovalChecks
     }
     private sealed class ScopeFixture(ActionScope owned) : IActionScopeValidator, IActionApprovalScopeValidator
     {
+        public Task<bool> ValidateActionAsync(ExactActionOwnershipScope action, CancellationToken token) =>
+            ValidateAsync(action.Scope, token);
         public bool Allow = true, RevokeSecond, ThrowFailure, Cancel;
         public int Calls;
         public CancellationTokenSource? CancelAndDeny;

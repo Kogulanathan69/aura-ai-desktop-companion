@@ -226,6 +226,8 @@ internal static class ProductionReconciliationEvidenceChecks
 
     private sealed class AllowScope : IExecutionReconciliationScopeValidator
     {
+        public Task<bool> ValidateActionAsync(ExactActionOwnershipScope action, CancellationToken token) =>
+            ValidateAsync(action.Scope, token);
         public Task<bool> ValidateAsync(ActionScope _, CancellationToken token)
         { token.ThrowIfCancellationRequested(); return Task.FromResult(true); }
     }

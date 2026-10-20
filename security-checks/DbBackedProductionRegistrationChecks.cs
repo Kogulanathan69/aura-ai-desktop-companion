@@ -25,8 +25,8 @@ internal static class DbBackedProductionRegistrationChecks
             review.Contains("partially unresolved"),
             "17L reuses bounded live baseline without inventing core-schema provenance");
         check(!api.Contains("AddDbContext<AuraDbContext>(") &&
-            api.Contains("AddScoped<IAuraDbContext>(provider =>") &&
-            api.Contains("provider.GetRequiredService<AuraDbContext>()") &&
+            api.Contains("AddScoped<IAuraDbContext>(") &&
+            api.Contains("OwnershipRuntimeFoundationRegistration.ResolveProductionDbContext") &&
             api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>(") &&
             !api.Contains("AddPooledDbContextFactory<AuraDbContext>(") &&
             !api.Contains("MigrateAsync(") && !api.Contains("EnsureCreated(") &&
@@ -60,8 +60,9 @@ internal static class DbBackedProductionRegistrationChecks
             api.Contains("AddDbContextFactory<AuraDbContext, AuraDbContextFactory>(") &&
             review.Contains("No production registrations or catalog entries were added"),
             "17L unresolved capabilities have no premature normal-startup registration");
-        check(new[] { "ReviewedOwnershipContext", "ReviewedSubjectMapping", "ReviewedOwnershipSource",
-                "ReviewedOwnershipValidator", "ReviewedPermission", "ReviewedExecutionState",
+        check(inspector.Contains("typeof(HttpCurrentUserContext)") &&
+            inspector.Contains("typeof(ExactOwnershipScopeValidator)") &&
+            new[] { "ReviewedPermission", "ReviewedExecutionState",
                 "ReviewedAuditSink", "ReviewedAuditDelivery", "ReviewedReconciliation" }
             .All(name => inspector.Contains($"{name} = new HashSet<Type>()", StringComparison.Ordinal)) &&
             review.Contains("No production registrations or catalog entries were added"),

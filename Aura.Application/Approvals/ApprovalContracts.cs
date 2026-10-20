@@ -81,7 +81,7 @@ public sealed class ApprovalOperationResult
     };
 }
 
-public interface IActionApprovalScopeValidator
+public interface IActionApprovalScopeValidator : IExactActionOwnershipValidator
 {
     // Future adapter must authenticate current user and verify owned conversation, exact
     // project association and owned project; it must not trust IDs as authorization.

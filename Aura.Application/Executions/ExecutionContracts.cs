@@ -91,7 +91,7 @@ public sealed class ExecutionEvidence
         CompletedAt);
 }
 
-public interface IToolExecutionScopeValidator
+public interface IToolExecutionScopeValidator : IExactActionOwnershipValidator
 {
     // Future adapter must authenticate current user and verify owned conversation,
     // exact project association and owned project. Never trust scope IDs alone.

@@ -31,7 +31,7 @@ internal static class ProductionOwnershipRegistrationChecks
         check(!api.Contains("AddScoped<ICurrentUserContext") &&
             !api.Contains("AddScoped<IOwnershipSource") &&
             !api.Contains("AddScoped<IToolExecutionScopeValidator") &&
-            inspector.Contains("ReviewedOwnershipContext = new HashSet<Type>()") &&
+            inspector.Contains("typeof(HttpCurrentUserContext)") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Ownership,
             "17B incomplete evidence leaves production registration and catalog blocked");
         return Task.CompletedTask;

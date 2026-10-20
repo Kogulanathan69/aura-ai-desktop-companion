@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Aura.Infrastructure.Data;
 
-// Read-only, unregistered external-subject to internal-user mapping.
+// Read-only external-subject to internal-user mapping.
 public sealed class AuthenticatedUserMappingSource(IAuraDbContext db) : IAuthenticatedUserMappingSource
 {
     public async Task<AuthenticatedUserMappingResult> GetAsync(Guid authUserId,

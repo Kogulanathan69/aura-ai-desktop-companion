@@ -80,8 +80,9 @@ internal static class LiveOwnershipVerification
                     "AUTH SUBJECT MAPPING", "AUTH NEGATIVE CASES", "PROJECT OWNERSHIP",
                     "CONVERSATION OWNERSHIP", "SCOPE NEGATIVE CASES" })
                     write(category + ": PASS");
-                write("RESULT: PASS");
-                return 0;
+                write("SOURCE RESULT: PASS");
+                write("PRODUCTION OWNERSHIP: INCOMPLETE");
+                return 1;
             }
 
             write(stage switch

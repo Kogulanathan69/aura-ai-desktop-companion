@@ -79,11 +79,11 @@ internal static class ProductionOwnershipEvidenceChecks
         values["ConnectionStrings__DefaultConnection"] = secret;
 
         output.Clear();
-        check(await LiveOwnershipVerification.RunProductionAsync(Read, output.Add, Pass) == 0 &&
-            calls == 1 && output.Count == 8 && output.Last() == "RESULT: PASS" &&
+        check(await LiveOwnershipVerification.RunProductionAsync(Read, output.Add, Pass) == 1 &&
+            calls == 1 && output.Count == 9 && output.Last() == "PRODUCTION OWNERSHIP: INCOMPLETE" &&
             output.All(line => !line.Contains("secret-value", StringComparison.Ordinal) &&
                 !line.Contains(subject.ToString("D"), StringComparison.OrdinalIgnoreCase)),
-            "15A explicit command emits bounded PASS categories without secrets or claims");
+            "17V source categories cannot imply real JWT or action ownership readiness");
         foreach (var stage in Enum.GetValues<LiveOwnershipStage>()
             .Where(value => value != LiveOwnershipStage.Passed))
         {
@@ -161,7 +161,7 @@ internal static class ProductionOwnershipEvidenceChecks
             "15A harness contains no migration, write, broad cleanup, worker or retry loop");
         check(!inspector.Ownership && !inspector.CompositionComplete &&
             api.Contains("new UnavailableRuntimeCapabilityReadiness()", StringComparison.Ordinal) &&
-            !api.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
+            api.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
             !api.Contains("AddScoped<ITrustedToolExecutionService", StringComparison.Ordinal),
             "15A evidence cannot activate ownership composition or production execution");
     }

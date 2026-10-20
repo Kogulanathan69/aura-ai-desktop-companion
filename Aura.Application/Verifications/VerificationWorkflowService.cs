@@ -27,7 +27,8 @@ public sealed class VerificationWorkflowService(ToolRegistry tools, IVerificatio
                 return VerificationOperationResult.Denied(VerificationOperationStatus.InvalidActionState);
             if (!ApprovalValidation.IsBoundToApprovedAction(approval, action, scope, action.ToolId))
                 return VerificationOperationResult.Denied(VerificationOperationStatus.ApprovalDenied);
-            var owned = await scopes.ValidateAsync(scope, cancellationToken);
+            var exactAction = ExactActionOwnershipScope.FromTrustedAction(action);
+            var owned = await scopes.ValidateActionAsync(exactAction, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!owned) return VerificationOperationResult.Denied(VerificationOperationStatus.ScopeDenied);
             if (!tools.TryResolve(action.ToolId, out var tool, out _) || tool is null)
@@ -62,7 +63,7 @@ public sealed class VerificationWorkflowService(ToolRegistry tools, IVerificatio
                  independent.ProofSource != VerificationProofSource.OwnedProjectMetadata ||
                  independent.ProofVersion != 1)))
                 return VerificationOperationResult.Denied(VerificationOperationStatus.EvidenceDenied);
-            owned = await scopes.ValidateAsync(scope, cancellationToken);
+            owned = await scopes.ValidateActionAsync(exactAction, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!owned) return VerificationOperationResult.Denied(VerificationOperationStatus.ScopeDenied);
             var now = clock.UtcNow;

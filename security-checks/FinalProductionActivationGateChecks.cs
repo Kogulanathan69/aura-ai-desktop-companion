@@ -112,7 +112,7 @@ internal static class FinalProductionActivationGateChecks
                 !program.Contains("AddSingleton<" + contract, StringComparison.Ordinal) &&
                 !program.Contains("AddTransient<" + contract, StringComparison.Ordinal),
                 "13L no production registration for " + contract);
-        check(!program.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
+        check(program.Contains(".AddOwnershipRuntimeFoundation(", StringComparison.Ordinal) &&
             !program.Contains("SecurityAuditOutboxDispatcher", StringComparison.Ordinal) &&
             !program.Contains("AddHostedService", StringComparison.Ordinal) &&
             !program.Contains("TrustedToolExecutionService", StringComparison.Ordinal),

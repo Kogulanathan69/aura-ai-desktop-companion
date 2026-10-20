@@ -42,7 +42,8 @@ public sealed class ActionLifecycleService(ToolRegistry tools, IActionScopeValid
             // Compare the entire immutable scope before any lookup; no cross-user/project/conversation result leakage.
             if (action.Scope != scope)
                 return ActionOperationResult.Denied(ActionOperationStatus.ScopeDenied);
-            var owned = await scopes.ValidateAsync(scope, cancellationToken);
+            var owned = await scopes.ValidateActionAsync(
+                ExactActionOwnershipScope.FromTrustedAction(action), cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!owned) return ActionOperationResult.Denied(ActionOperationStatus.ScopeDenied);
             var decision = ActionTransitionPolicy.Evaluate(action.Status, target);

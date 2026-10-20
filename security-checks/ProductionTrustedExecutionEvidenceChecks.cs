@@ -62,7 +62,7 @@ internal static class ProductionTrustedExecutionEvidenceChecks
         var sequence = new[] {
             "if (action.Scope != scope)",
             "ApprovalValidation.IsBoundToApprovedAction",
-            "scopes.ValidateAsync(scope, cancellationToken)",
+            "scopes.ValidateActionAsync(exactAction, cancellationToken)",
             "tools.TryResolve(action.ToolId",
             "permissions.HasPermissionAsync(scope, tool, cancellationToken)",
             "policy.AllowsAsync(tool, cancellationToken)",
@@ -76,12 +76,12 @@ internal static class ProductionTrustedExecutionEvidenceChecks
         };
         check(sequence.All(s => At(s) >= 0) && sequence.Zip(sequence.Skip(1))
                 .All(pair => At(pair.First) < At(pair.Second)) &&
-            At("scopes.ValidateAsync(scope, cancellationToken)") <
+            At("scopes.ValidateActionAsync(exactAction, cancellationToken)") <
                 At("permissions.HasPermissionAsync(scope, tool, cancellationToken)") &&
             service.Split("handler.ExecuteAsync(").Length == 2,
             "15J actual order: action/approval, ownership, tool, permission, policy, reservation, audit observation, one handler, completion, post-audit");
-        check(service.Contains("owned = await scopes.ValidateAsync(scope, cancellationToken);") &&
-            service.Split("scopes.ValidateAsync(scope, cancellationToken)").Length == 3 &&
+        check(service.Contains("owned = await scopes.ValidateActionAsync(exactAction, cancellationToken);") &&
+            service.Split("scopes.ValidateActionAsync(exactAction, cancellationToken)").Length == 3 &&
             service.Contains("if (!allowed) return ExecutionOperationResult.Denied(ExecutionOperationStatus.PolicyDenied)") &&
             service.Contains("if (!permitted) return ExecutionOperationResult.Denied(ExecutionOperationStatus.PermissionDenied)") &&
             service.Contains("ExecutionOperationStatus.ApprovalDenied") &&

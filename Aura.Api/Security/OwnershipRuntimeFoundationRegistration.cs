@@ -9,15 +9,24 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Aura.Api.Security;
 
-// Explicit, future-only composition. Normal Program.cs deliberately does not call it.
-// Registration is not a readiness claim or permission to enable production workflows.
+// Explicit production composition. Registration alone does not establish readiness
+// or permission to enable production workflows.
 public static class OwnershipRuntimeFoundationRegistration
 {
+    public static IAuraDbContext ResolveProductionDbContext(IServiceProvider provider) =>
+        provider.GetRequiredService<AuraDbContext>();
+
+    internal static bool IsExactDbContextAlias(ServiceDescriptor descriptor) =>
+        descriptor.Lifetime == ServiceLifetime.Scoped &&
+        descriptor.ImplementationFactory?.Method ==
+            ((Func<IServiceProvider, IAuraDbContext>)ResolveProductionDbContext).Method;
+
     public static IServiceCollection AddOwnershipRuntimeFoundation(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         var guarded = new[] { typeof(ICurrentUserContext), typeof(IOwnershipSource),
-            typeof(ExactOwnershipScopeValidator), typeof(IActionScopeValidator),
+            typeof(ExactOwnershipScopeValidator), typeof(IExactActionOwnershipValidator),
+            typeof(IActionScopeValidator),
             typeof(IActionApprovalScopeValidator), typeof(IToolExecutionScopeValidator),
             typeof(IVerificationScopeValidator), typeof(IExecutionReconciliationScopeValidator) };
         if (services.Any(descriptor => guarded.Contains(descriptor.ServiceType)))
@@ -39,16 +48,20 @@ public static class OwnershipRuntimeFoundationRegistration
         services.AddScoped<ICurrentUserContext, HttpCurrentUserContext>();
         services.AddScoped<IOwnershipSource, OwnershipPersistenceSource>();
         services.AddScoped<ExactOwnershipScopeValidator>();
-        services.AddScoped<IActionScopeValidator>(provider =>
-            provider.GetRequiredService<ExactOwnershipScopeValidator>());
-        services.AddScoped<IActionApprovalScopeValidator>(provider =>
-            provider.GetRequiredService<ExactOwnershipScopeValidator>());
-        services.AddScoped<IToolExecutionScopeValidator>(provider =>
-            provider.GetRequiredService<ExactOwnershipScopeValidator>());
-        services.AddScoped<IVerificationScopeValidator>(provider =>
-            provider.GetRequiredService<ExactOwnershipScopeValidator>());
-        services.AddScoped<IExecutionReconciliationScopeValidator>(provider =>
-            provider.GetRequiredService<ExactOwnershipScopeValidator>());
+        services.AddScoped<IExactActionOwnershipValidator>(ResolveValidator);
+        services.AddScoped<IActionScopeValidator>(ResolveValidator);
+        services.AddScoped<IActionApprovalScopeValidator>(ResolveValidator);
+        services.AddScoped<IToolExecutionScopeValidator>(ResolveValidator);
+        services.AddScoped<IVerificationScopeValidator>(ResolveValidator);
+        services.AddScoped<IExecutionReconciliationScopeValidator>(ResolveValidator);
         return services;
     }
+
+    private static ExactOwnershipScopeValidator ResolveValidator(IServiceProvider provider) =>
+        provider.GetRequiredService<ExactOwnershipScopeValidator>();
+
+    internal static bool IsExactValidatorAlias(ServiceDescriptor descriptor) =>
+        descriptor.Lifetime == ServiceLifetime.Scoped &&
+        descriptor.ImplementationFactory?.Method ==
+            ((Func<IServiceProvider, ExactOwnershipScopeValidator>)ResolveValidator).Method;
 }

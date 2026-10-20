@@ -97,7 +97,7 @@ internal static class ProductionExecutionPolicyEvidenceChecks
             inspector.Contains("ReviewedExecutionPolicy.Contains(implementation)"),
             "15H future policy needs unique exact reviewed scoped type, no factory or instance ambiguity");
         check(execution.Contains("ApprovalValidation.IsBoundToApprovedAction") &&
-            execution.Contains("scopes.ValidateAsync(scope, cancellationToken)") &&
+            execution.Contains("scopes.ValidateActionAsync(exactAction, cancellationToken)") &&
             execution.Contains("permissions.HasPermissionAsync(scope, tool, cancellationToken)") &&
             execution.Contains("policy.AllowsAsync(tool, cancellationToken)") &&
             execution.IndexOf("policy.AllowsAsync", StringComparison.Ordinal) <

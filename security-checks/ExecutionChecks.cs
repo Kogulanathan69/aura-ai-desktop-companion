@@ -243,6 +243,8 @@ internal static class ExecutionChecks
     }
     private sealed class ScopeFixture(ActionScope owned) : IActionScopeValidator, IActionApprovalScopeValidator, IToolExecutionScopeValidator
     {
+        public Task<bool> ValidateActionAsync(ExactActionOwnershipScope action, CancellationToken token) =>
+            ValidateAsync(action.Scope, token);
         public bool Allow = true, RevokeSecond;
         public int Calls;
         public CancellationTokenSource? CancelAndDeny;
