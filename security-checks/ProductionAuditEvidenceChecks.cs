@@ -127,18 +127,17 @@ internal static class ProductionAuditEvidenceChecks
             dispatcher.Contains("AuditSinkStatus.Unavailable") &&
             !dispatcher.Contains("while (", StringComparison.Ordinal),
             "15E direct sink and transactional outbox are distinct; dispatcher is one-item and explicit");
-        check(!api.Contains("SecurityAuditPersistenceSink", StringComparison.Ordinal) &&
-            !api.Contains("SecurityAuditOutboxDispatcher", StringComparison.Ordinal) &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation", StringComparison.Ordinal) &&
             !api.Contains("AddHostedService", StringComparison.Ordinal) &&
             !api.Contains("MigrateAsync", StringComparison.Ordinal) &&
-            inspector.Contains("ReviewedAuditSink = new HashSet<Type>()") &&
-            inspector.Contains("ReviewedAuditDelivery = new HashSet<Type>()") &&
+            inspector.Contains("ReviewedAuditSinkLiveEvidence") &&
+            inspector.Contains("ReviewedAuditDeliveryLiveEvidence") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).AuditSink &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).AuditDelivery &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().AuditSink &&
             !new RuntimeSafetyOptions().ProductionAdaptersEnabled &&
             !new RuntimeSafetyOptions().ToolExecutionEnabled,
-            "15E live evidence cannot activate audit composition or production execution");
+            "17X prior live evidence cannot activate changed audit paths or execution");
 
         var options = new DbContextOptionsBuilder<AuraDbContext>()
             .UseNpgsql("Host=localhost;Database=metadata_only", npgsql => npgsql.UseVector()).Options;

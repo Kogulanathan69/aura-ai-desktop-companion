@@ -49,6 +49,32 @@ public sealed class ActionExecutionStatePersistenceStore(
                 await db.Database.BeginTransactionAsync(
                     cancellationToken);
 
+            var now = DateTime.UtcNow;
+            var exactChain =
+                await db.Users.AsNoTracking().AnyAsync(x =>
+                        x.Id == ready.Scope.UserId && x.IsActive, cancellationToken) &&
+                await db.Projects.AsNoTracking().AnyAsync(x =>
+                        x.Id == ready.Scope.ProjectId && x.UserId == ready.Scope.UserId,
+                        cancellationToken) &&
+                await db.Conversations.AsNoTracking().AnyAsync(x =>
+                        x.Id == ready.Scope.ConversationId &&
+                        x.UserId == ready.Scope.UserId &&
+                        x.ProjectId == ready.Scope.ProjectId && x.Type == "Project",
+                        cancellationToken) &&
+                await db.AIActions.AsNoTracking().AnyAsync(x =>
+                        x.Id == ready.ActionId.Value && x.UserId == ready.Scope.UserId &&
+                        x.ConversationId == ready.Scope.ConversationId &&
+                        x.ProjectId == ready.Scope.ProjectId && x.ActionType == "Tool" &&
+                        x.RequiresApproval && x.Status == "Approved",
+                        cancellationToken) &&
+                await db.ActionApprovals.AsNoTracking().AnyAsync(x =>
+                        x.Id == ready.ApprovalId && x.AIActionId == ready.ActionId.Value &&
+                        x.UserId == ready.Scope.UserId && x.Decision == "Approved" &&
+                        x.DecidedAt != null && (x.ExpiresAt == null || x.ExpiresAt > now),
+                        cancellationToken);
+            if (!exactChain)
+                return Denied(ActionExecutionStateResultStatus.InvalidRequest);
+
             var row =
                 await db.ActionExecutionStates
                     .AsNoTracking()
@@ -85,8 +111,7 @@ public sealed class ActionExecutionStatePersistenceStore(
 
                         Version = 0,
 
-                        CreatedAt =
-                            DateTime.UtcNow
+                        CreatedAt = now
                     };
 
                 db.ActionExecutionStates.Add(row);

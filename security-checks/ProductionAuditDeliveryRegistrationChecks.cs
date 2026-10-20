@@ -18,11 +18,11 @@ internal static class ProductionAuditDeliveryRegistrationChecks
             !dispatcher.Contains("BackgroundService") &&
             !dispatcher.Contains("PeriodicTimer"),
             "17E exact dispatcher is explicit one-item work with no polling worker");
-        check(!api.Contains("AddScoped<IAuditOutboxDispatcher") &&
-            inspector.Contains("ReviewedAuditDelivery = new HashSet<Type>()") &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation") &&
+            inspector.Contains("ReviewedAuditDeliveryLiveEvidence") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).AuditDelivery &&
             !api.Contains("AddHostedService"),
-            "17E unresolved replay contract keeps delivery unregistered and unready");
+            "17X exact dispatcher remains gated by fresh replay evidence");
         return Task.CompletedTask;
     }
 }

@@ -99,13 +99,13 @@ internal static class ProductionExecutionStateEvidenceChecks
             !harness.Contains("HttpClient", StringComparison.Ordinal) &&
             !harness.Contains("ExecuteTool", StringComparison.Ordinal),
             "15D generated fixture cleanup is scoped and no migration, worker, provider or tool is invoked");
-        check(!api.Contains("ActionExecutionStatePersistenceStore", StringComparison.Ordinal) &&
-            inspector.Contains("ReviewedExecutionState = new HashSet<Type>()") &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation", StringComparison.Ordinal) &&
+            inspector.Contains("ReviewedExecutionStateLiveEvidence", StringComparison.Ordinal) &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).ExecutionState &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().ExecutionState &&
             !new RuntimeSafetyOptions().ProductionAdaptersEnabled &&
             !new RuntimeSafetyOptions().ToolExecutionEnabled,
-            "15D live evidence does not activate production composition or execution");
+            "17X prior live evidence does not activate the changed production path");
 
         var action = (ActionIdentifier)Activator.CreateInstance(typeof(ActionIdentifier),
             BindingFlags.Instance | BindingFlags.NonPublic, null, [Guid.NewGuid()], null)!;

@@ -113,15 +113,15 @@ internal static class ProductionReconciliationEvidenceChecks
             !serviceSource.Contains("TryCompleteAsync") &&
             !serviceSource.Contains("TryReserveAsync"),
             "15F real source is read-only and advisory service never mutates durable state");
-        check(!api.Contains("ExecutionReconciliationPersistenceSource", StringComparison.Ordinal) &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation", StringComparison.Ordinal) &&
             !api.Contains("AddHostedService", StringComparison.Ordinal) &&
             !api.Contains("MigrateAsync", StringComparison.Ordinal) &&
-            inspector.Contains("ReviewedReconciliation = new HashSet<Type>()") &&
+            inspector.Contains("ReviewedReconciliationLiveEvidence") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).Reconciliation &&
             !new UnavailableRuntimeCapabilityReadiness().GetSnapshot().Reconciliation &&
             !new RuntimeSafetyOptions().ProductionAdaptersEnabled &&
             !new RuntimeSafetyOptions().ToolExecutionEnabled,
-            "15F live PASS cannot activate production reconciliation or execution");
+            "17X prior live PASS cannot activate the changed reconciliation graph");
 
         var options = new DbContextOptionsBuilder<AuraDbContext>()
             .UseNpgsql("Host=localhost;Database=metadata_only", npgsql => npgsql.UseVector()).Options;

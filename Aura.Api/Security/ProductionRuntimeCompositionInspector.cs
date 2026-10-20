@@ -82,10 +82,26 @@ public static class ProductionRuntimeCompositionInspector
             "UNKNOWN GRANT DENY", "REVOKED GRANT DENY",
             "REVOCATION AFTER PRIOR ALLOW DENY", "NEGATIVE BINDINGS", "CLEANUP", "RESULT"
         };
-    private static readonly IReadOnlySet<Type> ReviewedExecutionState = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedAuditSink = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedAuditDelivery = new HashSet<Type>();
-    private static readonly IReadOnlySet<Type> ReviewedReconciliation = new HashSet<Type>();
+    private static readonly IReadOnlySet<Type> ReviewedExecutionState =
+        new HashSet<Type> { typeof(ActionExecutionStatePersistenceStore) };
+    private static readonly IReadOnlySet<Type> ReviewedAuditSink =
+        new HashSet<Type> { typeof(SecurityAuditPersistenceSink), typeof(AuditEventWriter) };
+    private static readonly IReadOnlySet<Type> ReviewedAuditDelivery =
+        new HashSet<Type> { typeof(SecurityAuditOutboxDispatcher) };
+    private static readonly IReadOnlySet<Type> ReviewedReconciliation =
+        new HashSet<Type> { typeof(ExecutionReconciliationPersistenceSource),
+            typeof(ExecutionReconciliationAssessmentPersistenceWriter),
+            typeof(ConservativeExecutionReconciliationPolicy),
+            typeof(ExecutionReconciliationService) };
+    // Changed Step 17X paths require a fresh target-bound run before readiness.
+    private static readonly IReadOnlySet<string> ReviewedExecutionStateLiveEvidence =
+        new HashSet<string>(StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> ReviewedAuditSinkLiveEvidence =
+        new HashSet<string>(StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> ReviewedAuditDeliveryLiveEvidence =
+        new HashSet<string>(StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> ReviewedReconciliationLiveEvidence =
+        new HashSet<string>(StringComparer.Ordinal);
     private static readonly IReadOnlySet<Type> ReviewedVerification =
         new HashSet<Type> { typeof(OwnedProjectMetadataExecutionEvidenceSource) };
     private static readonly IReadOnlySet<Type> ReviewedVerificationWriter =
@@ -125,10 +141,15 @@ public static class ProductionRuntimeCompositionInspector
             HasOne<IToolPermissionPolicy>(services, ReviewedPermissionPolicy) &&
             HasOne<IToolExecutionPermissionValidator>(services, ReviewedPermissionValidator) &&
             HasExactDbContextAlias(services) && HasOneScoped<AuraDbContext>(services);
-        var executionState = HasExactExecutionStateStore(services);
-        var auditSink = HasExactAuditSink(services);
-        var auditDelivery = HasExactAuditDeliveryDispatcher(services);
-        var reconciliation = HasExactReconciliationSource(services);
+        var executionState = HasRequiredExecutionStateLiveEvidence() &&
+            HasExactExecutionStateStore(services) && HasExactOwnershipFactory(services);
+        var auditSink = HasRequiredAuditSinkLiveEvidence() &&
+            HasExactAuditSink(services) && HasExactOwnershipFactory(services);
+        var auditDelivery = HasRequiredAuditDeliveryLiveEvidence() &&
+            HasExactAuditDeliveryDispatcher(services) && HasExactAuditSink(services) &&
+            HasExactOwnershipFactory(services);
+        var reconciliation = HasRequiredReconciliationLiveEvidence() &&
+            HasExactReconciliationGraph(services) && HasExactOwnershipFactory(services);
         var verification = HasExactVerificationSource(services) &&
             HasExactVerificationWriter(services) &&
             HasExactVerificationWorkflow(services) &&
@@ -278,10 +299,14 @@ public static class ProductionRuntimeCompositionInspector
     {
         var registrations = services.Where(item => item.ServiceType == typeof(IAuditEventSink))
             .ToArray();
-        return registrations.Length == 1 &&
+        var writers = services.Where(item => item.ServiceType == typeof(IAuditEventWriter)).ToArray();
+        return registrations.Length == 1 && writers.Length == 1 &&
             registrations[0].Lifetime == ServiceLifetime.Scoped &&
             registrations[0].ImplementationType == typeof(SecurityAuditPersistenceSink) &&
-            ReviewedAuditSink.Contains(typeof(SecurityAuditPersistenceSink));
+            ReviewedAuditSink.Contains(typeof(SecurityAuditPersistenceSink)) &&
+            writers[0].Lifetime == ServiceLifetime.Scoped &&
+            writers[0].ImplementationType == typeof(AuditEventWriter) &&
+            ReviewedAuditSink.Contains(typeof(AuditEventWriter));
     }
 
     // An explicit one-item dispatcher still needs a reviewed production lifetime
@@ -298,15 +323,54 @@ public static class ProductionRuntimeCompositionInspector
 
     // Durable state and an advisory source do not assert reviewed reconciliation.
     // The reviewed catalog remains empty until separate production evidence exists.
-    private static bool HasExactReconciliationSource(IServiceCollection services)
+    private static bool HasExactReconciliationGraph(IServiceCollection services)
     {
-        var registrations = services.Where(item => item.ServiceType == typeof(IExecutionReconciliationSource))
-            .ToArray();
-        return registrations.Length == 1 &&
-            registrations[0].Lifetime == ServiceLifetime.Scoped &&
-            registrations[0].ImplementationType == typeof(ExecutionReconciliationPersistenceSource) &&
-            ReviewedReconciliation.Contains(typeof(ExecutionReconciliationPersistenceSource));
+        return HasReviewedScoped<IExecutionReconciliationSource,
+                ExecutionReconciliationPersistenceSource>(services, ReviewedReconciliation) &&
+            HasReviewedScoped<IExecutionReconciliationAssessmentWriter,
+                ExecutionReconciliationAssessmentPersistenceWriter>(services, ReviewedReconciliation) &&
+            HasReviewedScoped<IExecutionReconciliationPolicy,
+                ConservativeExecutionReconciliationPolicy>(services, ReviewedReconciliation) &&
+            HasReviewedScoped<IExecutionReconciliationService,
+                ExecutionReconciliationService>(services, ReviewedReconciliation) &&
+            HasOneScoped<IExecutionReconciliationScopeValidator>(services);
     }
+
+    private static bool HasReviewedScoped<TContract, TImplementation>(IServiceCollection services,
+        IReadOnlySet<Type> reviewed) =>
+        services.Count(item => item.ServiceType == typeof(TContract) &&
+            item.Lifetime == ServiceLifetime.Scoped &&
+            item.ImplementationType == typeof(TImplementation)) == 1 &&
+        reviewed.Contains(typeof(TImplementation));
+
+    private static bool HasRequiredExecutionStateLiveEvidence() => HasRequiredLiveEvidence(
+        ReviewedExecutionStateLiveEvidence,
+        ["DB CONNECTIVITY: PASS", "SCHEMA CHECK: PASS", "FIXTURE SETUP: PASS",
+         "EXACT CROSS-ENTITY RESERVATION: PASS", "NEGATIVE CHAIN BINDINGS: PASS",
+         "STALE VERSION: PASS", "COMPLETION CONCURRENCY: PASS",
+         "AMBIGUOUS COMMIT: PASS", "NO HANDLER RETRY: PASS", "CLEANUP: PASS", "RESULT: PASS"]);
+
+    private static bool HasRequiredAuditSinkLiveEvidence() => HasRequiredLiveEvidence(
+        ReviewedAuditSinkLiveEvidence,
+        ["DB CONNECTIVITY: PASS", "SCHEMA CHECK: PASS", "AUDIT PERSISTENCE: PASS",
+         "BOUNDED PAYLOAD: PASS", "SECRET EXCLUSION: PASS", "CLEANUP: PASS", "RESULT: PASS"]);
+
+    private static bool HasRequiredAuditDeliveryLiveEvidence() => HasRequiredLiveEvidence(
+        ReviewedAuditDeliveryLiveEvidence,
+        ["DB CONNECTIVITY: PASS", "SCHEMA CHECK: PASS", "OUTBOX PENDING: PASS",
+         "DELIVERY SUCCESS: PASS", "RECOVERY/REPLAY: PASS", "IDEMPOTENCY: PASS",
+         "NO HANDLER REEXECUTION: PASS", "CLEANUP: PASS", "RESULT: PASS"]);
+
+    private static bool HasRequiredReconciliationLiveEvidence() => HasRequiredLiveEvidence(
+        ReviewedReconciliationLiveEvidence,
+        ["DB CONNECTIVITY: PASS", "SCHEMA CHECK: PASS", "FIXTURE SETUP: PASS",
+         "VERSION-BOUND PERSISTENCE: PASS", "STALE VERSION: PASS",
+         "REPEATED ASSESSMENT: PASS", "STATE IMMUTABILITY: PASS",
+         "CLEANUP: PASS", "RESULT: PASS"]);
+
+    private static bool HasRequiredLiveEvidence(IReadOnlySet<string> evidence,
+        IReadOnlyList<string> required) =>
+        evidence.Count == required.Count && required.All(evidence.Contains);
 
     // Presence alone is insufficient: each node must be exact, scoped and reviewed.
     private static bool HasExactVerificationSource(IServiceCollection services)

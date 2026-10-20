@@ -17,11 +17,11 @@ internal static class ProductionAuditSinkRegistrationChecks
             sink.Contains("CreateDbContextAsync") &&
             !sink.Contains("MigrateAsync") && !sink.Contains("EnsureCreated"),
             "17D exact direct sink uses operation context without schema mutation");
-        check(!api.Contains("AddScoped<IAuditEventSink") &&
-            inspector.Contains("ReviewedAuditSink = new HashSet<Type>()") &&
+        check(api.Contains("AddStateAuditReconciliationRuntimeFoundation") &&
+            inspector.Contains("ReviewedAuditSinkLiveEvidence") &&
             !ProductionRuntimeCompositionInspector.Inspect(new ServiceCollection()).AuditSink &&
             !api.Contains("AddHostedService"),
-            "17D unreviewed sink stays out of normal startup and does not imply delivery");
+            "17X exact sink graph remains gated and does not imply delivery");
         return Task.CompletedTask;
     }
 }

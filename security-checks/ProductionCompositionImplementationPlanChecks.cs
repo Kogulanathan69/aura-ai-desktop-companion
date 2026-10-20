@@ -38,9 +38,9 @@ internal static class ProductionCompositionImplementationPlanChecks
             api.Contains("new UnavailableRuntimeCapabilityReadiness()") &&
             inspector.Contains("typeof(HttpCurrentUserContext)") &&
             inspector.Contains("typeof(ToolPermissionPersistenceSource)") &&
-            inspector.Contains("ReviewedExecutionState = new HashSet<Type>()") &&
-            inspector.Contains("ReviewedAuditSink = new HashSet<Type>()") &&
-            inspector.Contains("ReviewedAuditDelivery = new HashSet<Type>()"),
+            inspector.Contains("ReviewedExecutionStateLiveEvidence") &&
+            inspector.Contains("ReviewedAuditSinkLiveEvidence") &&
+            inspector.Contains("ReviewedAuditDeliveryLiveEvidence"),
             "16A startup has no activation path; registration without reviewed catalogs is not readiness");
         return Task.CompletedTask;
     }

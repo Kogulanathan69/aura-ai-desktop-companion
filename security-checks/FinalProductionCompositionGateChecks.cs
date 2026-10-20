@@ -1,6 +1,7 @@
 using System.Reflection;
 using Aura.Api.Security;
 using Aura.Application.AI.Providers;
+using Aura.Application.Auditing;
 using Aura.Application.ProjectFiles.Content;
 using Aura.Application.Security;
 using Aura.Infrastructure.AI.OpenAI;
@@ -102,8 +103,7 @@ internal static class FinalProductionCompositionGateChecks
         check(!CanActivate(current, new RuntimeSafetyOptions(), startupRuntime, false),
             "14P current production activation is NOT READY");
 
-        var catalogNames = new[] { "ReviewedExecutionState", "ReviewedAuditSink", "ReviewedAuditDelivery",
-            "ReviewedReconciliation", "ReviewedExecutionPolicy",
+        var catalogNames = new[] { "ReviewedExecutionPolicy",
             "ReviewedToolHandlers", "ReviewedTrustedExecution" };
         foreach (var name in catalogNames)
         {
@@ -113,6 +113,13 @@ internal static class FinalProductionCompositionGateChecks
                 catalog?.GetType().GetProperty("Count")?.GetValue(catalog) is 0,
                 "14P reviewed production catalog remains intentionally empty: " + name);
         }
+        check(typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedExecutionState",
+                BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) is IReadOnlySet<Type> state &&
+            state.SetEquals([typeof(ActionExecutionStatePersistenceStore)]) &&
+            typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedAuditSink",
+                BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) is IReadOnlySet<Type> sink &&
+            sink.SetEquals([typeof(SecurityAuditPersistenceSink), typeof(AuditEventWriter)]),
+            "17X state and audit type catalogs are exact while evidence gates remain empty");
         check(typeof(ProductionRuntimeCompositionInspector).GetField("ReviewedVerification",
                 BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) is IReadOnlySet<Type> sources &&
             sources.SetEquals([typeof(OwnedProjectMetadataExecutionEvidenceSource)]),
